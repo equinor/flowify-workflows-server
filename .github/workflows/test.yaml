@@ -1,0 +1,41 @@
+name: Test
+on:
+  workflow_dispatch: {}
+  push:
+    paths-ignore:
+      - ".github/**"
+jobs:
+  tests:
+    name: Run all tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Run try to build container
+        run: docker build --build-arg GIT_COMMIT=${{ github.sha }} .
+      - name: Run tests and generate report
+        run: make docker_test
+      - name: Upload coverage
+        uses: romeovs/lcov-reporter-action@v0.2.21
+        if: always()
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          lcov-file: testoutputs/coverage.lcov
+      - name: Archive coverage
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: coverage
+          path: testoutputs/coverage.lcov
+      - name: Archive code test results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: report
+          path: testoutputs/report.xml
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          files: testoutputs/report.xml
+

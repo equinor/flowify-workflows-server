@@ -1,0 +1,28 @@
+name: Prod
+on:
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    name: Update deployment
+    runs-on: ubuntu-latest
+    env:
+      EMAIL: ${{ github.event.head_commit.author.email }}
+      NAME: ${{ github.event.head_commit.author.name }}
+    steps:
+      - name: Checkout infra
+        uses: actions/checkout@v2
+        with:
+          ref: main
+          repository: equinor/flowify-infrastructure
+          ssh-key: ${{ secrets.FLOWIFY_INFRA_DEPLOY_KEY }}
+      - name: Update infra
+        run: |
+          SHA_SHORT=$(echo ${{ github.sha }} | cut -c1-8)
+          SHA_LONG=${{ github.sha }}
+          git config --global user.email "${EMAIL}"
+          git config --global user.name  "GitHub Actions (${NAME})"
+          sed -i "s/imageTag:.*/imageTag: $SHA_LONG/g" kube/server/values-prod.yaml
+          git add kube/server/values-prod.yaml
+          git commit --message "GHA: Update production imageTag" || true
+          git push

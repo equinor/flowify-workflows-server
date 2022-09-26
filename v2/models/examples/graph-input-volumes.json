@@ -1,0 +1,71 @@
+{
+  "type": "job",
+  "uid": "00000000-0000-0000-0000-000000000001",
+  "description": "A job with volume input used as input into graph components",
+  "inputValues": [
+    { "value": "{\"name\":\"vol-config-0\"}", "target": "mount-0" },
+    { "value": "{\"name\":\"vol-config-1\"}", "target": "mount-1" }
+  ],
+  "workflow": {
+    "uid": "00000000-0000-0000-0000-000000000002",
+    "component": {
+      "type": "component",
+      "uid": "00000000-0000-0000-0000-000000000003",
+      "inputs": [
+        { "name": "mount-0", "type": "volume" },
+        { "name": "mount-1", "type": "volume" }
+      ],
+      "implementation": {
+        "type": "graph",
+        "inputMappings": [
+          {
+            "source": { "port": "mount-0" },
+            "target": { "node": "1", "port": "mount-a" }
+          },
+          {
+            "source": { "port": "mount-1" },
+            "target": { "node": "1", "port": "mount-b" }
+          }
+        ],
+        "nodes": [
+          {
+            "id": "1",
+            "node": {
+              "uid": "00000000-0000-0000-0000-000000000004",
+              "type": "component",
+              "inputs": [
+                { "name": "mount-a", "type": "volume" },
+                { "name": "mount-b", "type": "volume" }
+              ],
+              "implementation": {
+                "type": "brick",
+                "container": {
+                  "image": "docker/whalesay",
+                  "command": ["cowsay"]
+                },
+                "args": [
+                  {
+                    "target": {
+                      "type": "volume",
+                      "prefix": "/opt/volumes/"
+                    },
+                    "source": { "port": "mount-a" }
+                  },
+                  {
+                    "target": {
+                      "type": "volume",
+                      "prefix": "/mnt"
+                    },
+                    "source": { "port": "mount-b" }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "type": "workflow",
+    "workspace": "test"
+  }
+}

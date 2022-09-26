@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z][-a-zA-Z0-9_]*$"
+    },
+    "mediatype": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^(parameter|env_secret|artifact|parameter_array|volume)$"
+    },
+    "userdata": {
+      "type": "object",
+      "description": "An opaque field for frontend applications, never touched by the backend"
+    }
+  },
+  "additionalItems": false,
+  "required": ["name", "type"]
+}

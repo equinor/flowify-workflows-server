@@ -1,0 +1,331 @@
+{
+    "description": "Job example",
+    "type": "job",
+    "inputValues": [
+        {
+            "value": "6",
+            "target": "numParts"
+        },
+        {
+            "value": "SECRET_PASS",
+            "target": "secretL1" 
+        },
+        {
+            "value": ["A", "B"],
+            "target": "branch"
+        }
+    ],
+    "workflow":
+    {
+        "name": "wf-example",
+		"description": "Test workflow with an map example",
+		"type": "workflow",
+		"workspace": "argo",
+        "component":
+        {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144c0",
+            "description": "Graph component",
+            "inputs": [
+                { "name": "numParts", "type": "parameter" },
+                { "name": "secretL1", "type": "env_secret" },
+                { "name": "branch", "type": "parameter_array" }
+            ],
+            "outputs": [],
+            "type": "component",
+            "implementation": {
+                "type": "graph",
+                "inputMappings": [
+                    {
+                        "source": { "port": "numParts" },
+                        "target": { "node": "m1", "port": "numParts" }
+                    },
+                    {
+                        "source": { "port": "branch" },
+                        "target": { "node": "m1", "port": "branch" }
+                    },
+                    {
+                        "source": { "port": "secretL1" },
+                        "target": { "node": "m1", "port": "secretL1" }
+                    }
+                ],
+                "outputMappings": [],
+                "nodes": [
+                    {
+                        "id": "m1",
+                        "node": 
+                        {
+                            "uid": "192161d7-e3f2-4991-adc0-a99c88c144c1",
+                            "description": "Map component",
+                            "inputs": [
+                                { "name": "numParts", "type": "parameter" },
+                                { "name": "secretL1", "type": "env_secret" },
+                                { "name": "branch", "type": "parameter_array" }
+                            ],
+                            "outputs": [
+                                { "name": "outputM1", "type": "parameter_array" }
+                            ],
+                            "type": "component",
+                            "implementation": {
+                                "type": "map",
+                                "inputMappings": [
+                                    {
+                                        "source": { "port": "numParts" },
+                                        "target": { "port": "nparts" }
+                                    },
+                                    {
+                                        "source": { "port": "branch" },
+                                        "target": { "port": "brn" }
+                                    },
+                                    {
+                                        "source": { "port": "secretL1" },
+                                        "target": { "port": "secretPass" }
+                                    }
+                                ],
+                                "outputMappings": [
+                                    {
+                                        "source": { "port": "outputN1"},
+                                        "target": { "port": "outputM1" }
+                                    }
+                                ],
+                                "node": {
+                                    "uid": "192161d7-e3f2-4991-adc0-a99c88c144c2",
+                                    "description": "Map inner graph",
+                                    "inputs": [
+                                        { "name": "nparts", "type": "parameter" },
+                                        { "name": "brn", "type": "parameter" },
+                                        { "name": "secretPass", "type": "env_secret" }
+                                    ],
+                                    "outputs": [
+                                        { "name": "outputN1", "type": "parameter_array" }
+                                    ],
+                                    "type": "component",
+                                    "implementation": {
+                                        "type": "graph",
+                                        "inputMappings": [
+                                            {
+                                                "source": { "port": "nparts" },
+                                                "target": { "node": "NM1", "port": "inputParam" }
+                                            },
+                                            {
+                                                "source": { "port": "brn" },
+                                                "target": { "node": "NM1", "port": "val" }
+                                            },
+                                            {
+                                                "source": { "port": "secretPass" },
+                                                "target": { "node": "NM1", "port": "inputScrt"}
+                                            }
+                                        ],
+                                        "outputMappings": [
+                                            {
+                                                "source": { "node": "NM2", "port": "outputNM2" },
+                                                "target": { "port": "outputN1" }
+                                            }
+                                        ],
+                                        "nodes": [
+                                            {
+                                                "id": "NM1",
+                                                "node": {
+                                                    "uid": "192161d7-e3f2-4991-adc0-a99c88c144b0",
+                                                    "description": "MapNode1",
+                                                    "inputs": [
+                                                        { "name": "inputParam", "type": "parameter" },
+                                                        { "name": "val", "type": "parameter" },
+                                                        { "name": "inputScrt", "type": "env_secret" }
+                                                    ],
+                                                    "outputs": [
+                                                        { "name": "output", "type": "parameter_array" }
+                                                    ],
+                                                    "type": "component",
+                                                    "implementation": {
+                                                        "type": "brick",
+                                                        "container": {
+                                                            "name": "containername_n1_b1",
+                                                            "image": "alpine:latest",
+                                                            "command": ["sh", "-c", "echo $inputScrt; ARR=\"[\"; for i in $(seq $0); do ARR=$ARR\\\"$1$i\\\"\", \" ; done; ARR=${ARR%??}\"]\"; echo $ARR | tee /tmp/prm"],
+                                                            "args": []
+                                                        },
+                                                        "args": [
+                                                            {
+                                                                "source": { "port": "inputParam" },
+                                                                "target": { "type": "parameter" }
+                                                            },
+                                                            {
+                                                                "source": { "port": "val" },
+                                                                "target": { "type": "parameter" }
+                                                            }
+                                                        ],
+                                                        "results": [
+                                                            {
+                                                                "source": { "file": "/tmp/prm" },
+                                                                "target": { "port": "output" }
+                                                            }
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                "id": "NM2",
+                                                "node": 
+                                                {
+                                                    "uid": "192161d7-e3f2-4991-adc0-a99c88c144c3",
+                                                    "description": "Inner map",
+                                                    "inputs": [
+                                                        { "name": "vals", "type": "parameter_array" }
+                                                    ],
+                                                    "outputs": [
+                                                        { "name": "outputNM2", "type": "parameter_array" }
+                                                    ],
+                                                    "type": "component",
+                                                    "implementation": {
+                                                        "type": "map",
+                                                        "inputMappings": [
+                                                            {
+                                                                "source": { "port": "vals" },
+                                                                "target": { "port": "val" }
+                                                            }
+                                                        ],
+                                                        "outputMappings": [
+                                                            {
+                                                                "source": { "port": "output" },
+                                                                "target": { "port": "outputNM2" }
+                                                            }
+                                                        ],
+                                                        "node": {
+                                                            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b1",
+                                                            "description": "MapNode2",
+                                                            "inputs": [
+                                                                { "name": "val", "type": "parameter" }
+                                                            ],
+                                                            "outputs": [
+                                                                { "name": "output", "type": "parameter" }
+                                                            ],
+                                                            "type": "component",
+                                                            "implementation": {
+                                                                "type": "brick",
+                                                                "container": {
+                                                                    "name": "containername_n1_b1",
+                                                                    "image": "alpine:latest",
+                                                                    "command": ["sh", "-c", "echo $0 | tee /tmp/prm"],
+                                                                    "args": []
+                                                                },
+                                                                "args": [
+                                                                    {
+                                                                        "source": { "port": "val" },
+                                                                        "target": { "type": "parameter" }
+                                                                    }
+                                                                ],
+                                                                "results": [
+                                                                    {
+                                                                        "source": { "file": "/tmp/prm" },
+                                                                        "target": { "port": "output" }
+                                                                    }
+                                                                ]
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        "edges": [
+                                            {
+                                                "source": { "node": "NM1", "port": "output" },
+                                                "target": { "node": "NM2", "port": "vals" }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "m2",
+                        "node":
+                        {
+                            "uid": "192161d7-e3f2-4991-adc0-a99c88c144c4",
+                            "description": "Map component",
+                            "inputs": [
+                                { "name": "param", "type": "parameter_array" }
+                            ],
+                            "outputs": [],
+                            "type": "component",
+                            "implementation": {
+                                "type": "map",
+                                "inputMappings": [
+                                    {
+                                        "source": { "port": "param" },
+                                        "target": { "port": "param" }
+                                    }
+                                ],
+                                "outputMappings": [],
+                                "node": {
+                                    "uid": "192161d7-e3f2-4991-adc0-a99c88c144b2",
+                                    "description": "MapNode1",
+                                    "inputs": [
+                                        { "name": "param", "type": "parameter" }
+                                    ],
+                                    "outputs": [],
+                                    "type": "component",
+                                    "implementation": {
+                                        "type": "brick",
+                                        "container": {
+                                            "name": "containername_n1_b1",
+                                            "image": "alpine:latest",
+                                            "command": ["sh", "-c", "echo"],
+                                            "args": []
+                                        },
+                                        "args": [
+                                            {
+                                                "source": { "port": "param" },
+                                                "target": { "type": "parameter" }
+                                            }
+                                        ],
+                                        "results": []
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "m3",
+                        "node":
+                        {
+                            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b3",
+                            "description": "Brick",
+                            "inputs": [
+                                { "name": "param", "type": "parameter" }
+                            ],
+                            "outputs": [],
+                            "type": "component",
+                            "implementation": {
+                                "type": "brick",
+                                "container": {
+                                    "name": "containername_n1_b1",
+                                    "image": "alpine:latest",
+                                    "command": ["sh", "-c", "echo"],
+                                    "args": []
+                                },
+                                "args": [
+                                    {
+                                        "source": { "port": "param" },
+                                        "target": { "type": "parameter" }
+                                    }
+                                ],
+                                "results": []
+                            }
+                        }
+                    }
+                ],
+                "edges": [
+                    {
+                        "source": { "node": "m1", "port": "outputM1" },
+                        "target": { "node": "m2", "port": "param" }
+                    },
+                    {
+                        "source": { "node": "m1", "port": "outputM1" },
+                        "target": { "node": "m3", "port": "param" }
+                    }
+                ]
+            }
+        }
+    }
+}

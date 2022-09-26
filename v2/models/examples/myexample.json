@@ -1,0 +1,226 @@
+{
+  "uid": "192161d7-e3f2-4991-adc0-a99c88c144c0",
+  "description": "My cool workflow",
+  "inputs": [],
+  "outputs": [],
+  "type": "component",
+  "implementation": {
+    "type": "graph",
+    "inputMappings": [],
+    "nodes": [
+      {
+        "id": "N1",
+        "node": {
+          "uid": "192161d7-e3f2-4991-adc0-a99c88c144b1",
+          "description": "B1",
+          "inputs": [],
+          "outputs": [],
+          "type": "component",
+          "implementation": {
+            "type": "brick",
+            "container": {
+              "name": "containername_n1_b1",
+              "image": "docker/whalesay",
+              "command": ["cowsay"],
+              "args": ["Hello from B1"]
+            },
+            "args": []
+          }
+        }
+      },
+      {
+        "id": "N2",
+        "node": {
+          "uid": "192161d7-e3f2-4991-adc0-a99c88c144c2",
+          "description": "G2",
+          "inputs": [],
+          "outputs": [],
+          "type": "component",
+          "implementation": {
+            "type": "graph",
+            "nodes": [
+              {
+                "id": "N2G2B2",
+                "node": {
+                  "uid": "192161d7-e3f2-4991-adc0-a99c88c144b2",
+                  "description": "B2",
+                  "inputs": [],
+                  "outputs": [],
+                  "type": "component",
+                  "implementation": {
+                    "type": "brick",
+                    "container": {
+                      "name": "containername",
+                      "image": "docker/whalesay",
+                      "command": ["cowsay"],
+                      "args": ["Hello from B2"]
+                    }
+                  }
+                }
+              }
+            ],
+            "edges": []
+          }
+        }
+      },
+      {
+        "id": "N3",
+        "node": {
+          "uid": "192161d7-e3f2-4991-adc0-a99c88c144c3",
+          "description": "G3",
+          "inputs": [],
+          "outputs": [],
+          "type": "component",
+          "implementation": {
+            "type": "graph",
+            "inputMappings": [],
+            "nodes": [
+              {
+                "id": "N3G31",
+                "node": {
+                  "uid": "192161d7-e3f2-4991-adc0-a99c88c14b31",
+                  "description": "B31",
+                  "inputs": [],
+                  "outputs": [],
+                  "type": "component",
+                  "implementation": {
+                    "type": "brick",
+                    "container": {
+                      "name": "containername",
+                      "image": "docker/whalesay",
+                      "command": ["cowsay"],
+                      "args": ["Hello from N3B31"]
+                    },
+                    "args": []
+                  }
+                }
+              },
+              {
+                "id": "N3G32",
+                "node": {
+                  "uid": "192161d7-e3f2-4991-adc0-a99c88c14c32",
+                  "description": "G32",
+                  "inputs": [],
+                  "outputs": [],
+                  "type": "component",
+                  "implementation": {
+                    "type": "graph",
+                      "nodes": [
+                        {
+                          "id": "N3G32B32",
+                          "node": {
+                            "uid": "192161d7-e3f2-4991-adc0-a99c88c14b32",
+                            "description": "B31",
+                            "inputs": [],
+                            "outputs": [],
+                            "type": "component",
+                            "implementation": {
+                              "type": "brick",
+                              "container": {
+                                "name": "containername",
+                                "image": "docker/whalesay",
+                                "command": ["cowsay"],
+                                "args": ["Hello from B32"]
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "edges": []
+                  }
+                }
+              }
+            ],
+            "edges": []
+          }
+        }
+      },
+      {
+        "id": "N4",
+        "node": {
+          "uid": "192161d7-e3f2-4991-adc0-a99c88c144b4",
+          "description": "B4",
+          "inputs": [],
+          "outputs": [],
+          "type": "component",
+          "implementation": {
+            "type": "brick",
+            "container": {
+              "name": "containername",
+              "image": "docker/whalesay",
+              "command": ["cowsay"],
+              "args": ["Hello there! From B4"]
+            },
+            "args": []
+          }
+        }
+      },
+      {
+        "id": "N5",
+        "node": {
+          "uid": "192161d7-e3f2-4991-adc0-a99c88c144b5",
+          "description": "B5",
+          "inputs": [],
+          "outputs": [],
+          "type": "component",
+          "implementation": {
+            "type": "brick",
+            "container": {
+              "name": "containername",
+              "image": "docker/whalesay",
+              "command": ["cowsay"],
+              "args": ["Hello there! From B5"]
+            },
+            "args": []
+          }
+        }
+      },
+      {
+        "id": "N6",
+        "node": {
+          "uid": "192161d7-e3f2-4991-adc0-a99c88c144c6",
+          "description": "G6",
+          "inputs": [],
+          "outputs": [],
+          "type": "component",
+          "implementation": {
+            "type": "graph",
+            "nodes": [
+              {
+                "id": "N6G6B6",
+                "node": {
+                  "uid": "192161d7-e3f2-4991-adc0-a99c88c144b6",
+                  "description": "B6",
+                  "inputs": [],
+                  "outputs": [],
+                  "type": "component",
+                  "implementation": {
+                    "type": "brick",
+                    "container": {
+                      "name": "containername",
+                      "image": "docker/whalesay",
+                      "command": ["cowsay"],
+                      "args": ["Hello from B6"]
+                    }
+                  }
+                }
+              }
+            ],
+            "edges": []
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "source": "N1", "target": "N2" },
+      { "source": "N1", "target": "N3" },
+      { "source": "N2", "target": "N4" },
+      { "source": "N3", "target": "N4" },
+      { "source": "N3", "target": "N5" },
+      { "source": "N4", "target": "N6" },
+      { "source": "N5", "target": "N6" }
+    ]
+  }
+}
+  
+

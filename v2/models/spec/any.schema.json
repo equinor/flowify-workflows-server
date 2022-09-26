@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "pattern": "^any$"
+    }
+  },
+  "required": ["type"],
+  "additionalProperties": false
+}

@@ -1,0 +1,83 @@
+name: Deploy
+on:
+  workflow_dispatch: {}
+  push:
+    paths-ignore:
+      - ".github/**"
+    tags: '*'
+    branches:
+      - main
+env:
+  PROJECT: flowify
+
+jobs:
+  build:
+    name: Push image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Login to the dev container registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}"                         \
+            | docker login --username "${{ secrets.DOCKER_USERNAME }}"  \
+                           --password-stdin                             \
+                           auroradevacr.azurecr.io
+      - name: Build dev image
+        uses: docker/build-push-action@v2
+        with:
+          labels: |
+            com.equinor.aurora.project=${{ env.PROJECT }}
+            org.opencontainers.image.created=${{ env.DATE }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          tags: auroradevacr.azurecr.io/flowify/flowify-workflows-server:${{ github.sha }}
+          build-args: GIT_COMMIT=${{ github.sha }}
+          push: true
+      - name: Logout from the container registry
+        run: |
+          docker logout
+      - name: Login to the prod container registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}"                         \
+            | docker login --username "${{ secrets.DOCKER_USERNAME }}"  \
+                           --password-stdin                             \
+                           auroraprodacr.azurecr.io
+      - name: Build prod image
+        uses: docker/build-push-action@v2
+        with:
+          labels: |
+            com.equinor.aurora.project=${{ env.PROJECT }}
+            org.opencontainers.image.created=${{ env.DATE }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          tags: auroraprodacr.azurecr.io/flowify/flowify-workflows-server:${{ github.sha }}
+          build-args: GIT_COMMIT=${{ github.sha }}
+          push: true
+      - name: Logout from the container registry
+        run: |
+          docker logout
+  deploy:
+    name: Update deployment
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      EMAIL: ${{ github.event.head_commit.author.email }}
+      NAME: ${{ github.event.head_commit.author.name }}
+    steps:
+      - name: Checkout infra
+        uses: actions/checkout@v2
+        with:
+          ref: main
+          repository: equinor/flowify-infrastructure
+          ssh-key: ${{ secrets.FLOWIFY_INFRA_DEPLOY_KEY }}
+      - name: Update infra
+        run: |
+          SHA_SHORT=$(echo ${{ github.sha }} | cut -c1-8)
+          SHA_LONG=${{ github.sha }}
+          git config --global user.email "${EMAIL}"
+          git config --global user.name  "GitHub Actions (${NAME})"
+          sed -i "s/imageTag:.*/imageTag: $SHA_LONG/g" kube/server/values-dev.yaml
+          git add kube/server/values-dev.yaml
+          git commit --message "GHA: Update development imageTag" || true
+          git push

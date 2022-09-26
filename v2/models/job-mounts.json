@@ -1,0 +1,30 @@
+{
+  "description": "Job example with volume mounts",
+  "type": "job",
+  "inputValues": [
+    {
+      "value": "{\"name\":\"workdir\",\"persistentVolumeClaim\":{\"claimName\":\"my-existing-volume\"}}",
+      "target": "mount-a"
+    }
+  ],
+  "workflow": {
+    "name": "hello-mount-example",
+    "description": "Test workflow with a mounted volume",
+    "type": "workflow",
+    "workspace": "argo",
+    "component": {
+      "description": "My cool component, that can read from a mount.",
+      "inputs": [{ "name": "mount-a", "type": "volume" }],
+      "outputs": [],
+      "type": "component",
+      "implementation": {
+        "type": "brick",
+        "container": {
+          "name": "containername",
+          "image": "alpine:latest",
+          "command": ["sh", "-c", "ls /volumes/mount-a"]
+        }
+      }
+    }
+  }
+}

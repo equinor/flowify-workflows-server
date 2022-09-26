@@ -1,0 +1,34 @@
+{
+  "type": "object",
+  "properties": {
+    "source": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "$ref": "port.schema.json"
+        }
+      ]
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "prefix": {
+          "type": "string",
+          "description": "Prefix added in front of the value extracted from the argument (e.g. prefix \"--value=\" will result in \"--value={{parameter_value}}\")"
+        },
+        "suffix": { 
+          "type": "string",
+          "description": "Suffix added at the end of the value extracted from the argument (e.g. prefix \"/file.txt\" will result in \"{{parameter_value}}/file.txt\")"
+        }
+      },
+      "required": ["type"],
+      "additionalItems": false
+    },
+    "description": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": ["source"]
+}

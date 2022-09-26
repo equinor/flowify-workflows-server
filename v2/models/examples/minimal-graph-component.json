@@ -1,0 +1,25 @@
+{
+  "description": "An single node graph component",
+  "type": "component",
+  "implementation": {
+    "type": "graph",
+    "nodes": [
+      {
+        "id": "gaia",
+        "node": {
+          "description": "A brick component",
+          "type": "component",
+          "implementation": {
+            "type": "brick",
+            "container": {
+              "name": "containername",
+              "image": "docker/whalesay",
+              "command": ["cowsay"],
+              "args": ["Hello Test"]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "volume.schema.json"
+      }
+    },
+    "pageInfo": {
+      "$ref": "pageinfo.schema.json"
+    }
+  },
+  "additionalItems": false,
+  "required": ["items"]
+}

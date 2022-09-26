@@ -1,0 +1,422 @@
+{
+  "description": "Job example with inputs and secrets",
+  "type": "job",
+  "inputValues": [
+    {
+      "value": "10",
+      "target": "seedT"
+    },
+    {
+      "value": "SECRET_PASS",
+      "target": "secretL1"
+    },
+    {
+      "value": "SECRET_ID",
+      "target": "secretL2"
+    },
+    {
+      "value": "SECRET_VAL",
+      "target": "secretL3"
+    }
+  ],
+  "workflow": {
+    "name": "wf-example",
+    "description": "Test workflow with an inline any-component",
+    "type": "workflow",
+    "workspace": "sandbox-project-a",
+    "component": {
+      "uid": "192161d7-e3f2-4991-adc0-a99c88c144c0",
+      "description": "My cool graph",
+      "inputs": [
+        { "name": "seedT", "mediatype": ["integer"], "type": "parameter" },
+        { "name": "secretL1", "type": "env_secret" },
+        { "name": "secretL2", "type": "env_secret" },
+        { "name": "secretL3", "type": "env_secret" }
+      ],
+      "type": "component",
+      "implementation": {
+        "type": "graph",
+        "inputMappings": [
+          {
+            "source": { "port": "seedT" },
+            "target": { "node": "N1", "port": "seedN1" }
+          },
+          {
+            "source": { "port": "seedT" },
+            "target": { "node": "N2", "port": "seedMain" }
+          },
+          {
+            "source": { "port": "secretL1" },
+            "target": { "node": "N1", "port": "secretB1" }
+          },
+          {
+            "source": { "port": "secretL2" },
+            "target": { "node": "N1", "port": "secretB2" }
+          },
+          {
+            "source": { "port": "secretL1" },
+            "target": { "node": "N2", "port": "secretG1" }
+          },
+          {
+            "source": { "port": "secretL2" },
+            "target": { "node": "N2", "port": "secretG2" }
+          },
+          {
+            "source": { "port": "secretL3" },
+            "target": { "node": "N2", "port": "secretG3" }
+          },
+          {
+            "source": { "port": "secretL1" },
+            "target": { "node": "N4", "port": "secretPASS" }
+          }
+        ],
+        "nodes": [
+          {
+            "id": "N1",
+            "node": {
+              "uid": "192161d7-e3f2-4991-adc0-a99c88c144b1",
+              "description": "B1",
+              "inputs": [
+                {
+                  "name": "seedN1",
+                  "mediatype": ["integer"],
+                  "type": "parameter"
+                },
+                { "name": "secretB1", "type": "env_secret" },
+                { "name": "secretB2", "type": "env_secret" }
+              ],
+              "type": "component",
+              "implementation": {
+                "type": "brick",
+                "container": {
+                  "name": "containername_n1_b1",
+                  "image": "alpine:latest",
+                  "command": [
+                    "sh",
+                    "-c",
+                    "echo \"$0\"; echo $secretB1 $secretB2"
+                  ]
+                },
+                "args": [
+                  {
+                    "source": { "port": "seedN1" },
+                    "target": { "type": "parameter" }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "N2",
+            "node": {
+              "uid": "192161d7-e3f2-4991-adc0-a99c88c144c2",
+              "description": "G2",
+              "inputs": [
+                {
+                  "name": "seedMain",
+                  "mediatype": ["integer"],
+                  "type": "parameter"
+                },
+                { "name": "secretG1", "type": "env_secret" },
+                { "name": "secretG2", "type": "env_secret" },
+                { "name": "secretG3", "type": "env_secret" }
+              ],
+              "outputs": [
+                {
+                  "name": "value",
+                  "mediatype": ["string"],
+                  "type": "parameter"
+                },
+                {
+                  "name": "artifactVal",
+                  "mediatype": ["string"],
+                  "type": "artifact"
+                }
+              ],
+              "type": "component",
+              "implementation": {
+                "type": "graph",
+                "inputMappings": [
+                  {
+                    "source": { "port": "seedMain" },
+                    "target": { "node": "N3", "port": "val" }
+                  },
+                  {
+                    "source": { "port": "secretG1" },
+                    "target": { "node": "N2G2B2", "port": "secretW1" }
+                  },
+                  {
+                    "source": { "port": "secretG2" },
+                    "target": { "node": "N2G2B2", "port": "secretW2" }
+                  },
+                  {
+                    "source": { "port": "secretG3" },
+                    "target": { "node": "N2G2B2", "port": "secretW3" }
+                  }
+                ],
+                "outputMappings": [
+                  {
+                    "source": { "node": "N3", "port": "parameterVal" },
+                    "target": { "port": "value" }
+                  },
+                  {
+                    "source": { "node": "N3", "port": "artifactVal" },
+                    "target": { "port": "artifactVal" }
+                  }
+                ],
+                "nodes": [
+                  {
+                    "id": "N2G2B2",
+                    "node": {
+                      "uid": "192161d7-e3f2-4991-adc0-a99c88c144b2",
+                      "description": "B2",
+                      "inputs": [
+                        { "name": "secretW1", "type": "env_secret" },
+                        { "name": "secretW2", "type": "env_secret" },
+                        { "name": "secretW3", "type": "env_secret" }
+                      ],
+                      "outputs": [
+                        {
+                          "name": "value",
+                          "mediatype": ["string"],
+                          "type": "parameter"
+                        },
+                        {
+                          "name": "artifactVal",
+                          "mediatype": ["string"],
+                          "type": "artifact"
+                        }
+                      ],
+                      "type": "component",
+                      "implementation": {
+                        "type": "brick",
+                        "container": {
+                          "name": "containername",
+                          "image": "alpine:latest",
+                          "command": [
+                            "sh",
+                            "-c",
+                            "echo $secretW1 $secretW2 | tee /tmp/param; echo $secretW3 | tee /tmp/artifact"
+                          ]
+                        },
+                        "results": [
+                          {
+                            "source": { "file": "/tmp/param" },
+                            "target": { "port": "value" }
+                          },
+                          {
+                            "source": { "file": "/tmp/artifact" },
+                            "target": { "port": "artifactVal" }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "id": "N3",
+                    "node": {
+                      "uid": "192161d7-e3f2-4991-adc0-a99c88c144b3",
+                      "description": "B3",
+                      "inputs": [
+                        {
+                          "name": "val",
+                          "mediatype": ["string"],
+                          "type": "parameter"
+                        },
+                        {
+                          "name": "paramVal",
+                          "mediatype": ["string"],
+                          "type": "parameter"
+                        },
+                        {
+                          "name": "artifVal",
+                          "mediatype": ["string"],
+                          "type": "artifact"
+                        }
+                      ],
+                      "outputs": [
+                        {
+                          "name": "parameterVal",
+                          "mediatype": ["string"],
+                          "type": "parameter"
+                        },
+                        {
+                          "name": "artifactVal",
+                          "mediatype": ["string"],
+                          "type": "artifact"
+                        }
+                      ],
+                      "type": "component",
+                      "implementation": {
+                        "type": "brick",
+                        "container": {
+                          "name": "containername_n1_b1",
+                          "image": "alpine:latest",
+                          "command": [
+                            "sh",
+                            "-c",
+                            "echo val \"$0\"; echo paramVal \"$1\" | tee /tmp/parameter; echo artifVal ; cat \"$2\"; echo requests > /tmp/requirements.txt"
+                          ]
+                        },
+                        "args": [
+                          {
+                            "source": { "port": "val" },
+                            "target": { "type": "parameter" }
+                          },
+                          {
+                            "source": { "port": "paramVal" },
+                            "target": { "type": "parameter" }
+                          },
+                          {
+                            "source": { "port": "artifVal" },
+                            "target": { "type": "artifact" }
+                          }
+                        ],
+                        "results": [
+                          {
+                            "source": { "file": "/tmp/parameter" },
+                            "target": { "port": "parameterVal" }
+                          },
+                          {
+                            "source": { "file": "/tmp/requirements.txt" },
+                            "target": { "port": "artifactVal" }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "source": { "node": "N2G2B2", "port": "value" },
+                    "target": { "node": "N3", "port": "paramVal" }
+                  },
+                  {
+                    "source": { "node": "N2G2B2", "port": "artifactVal" },
+                    "target": { "node": "N3", "port": "artifVal" }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "N4",
+            "node": {
+              "uid": "192161d7-e3f2-4991-adc0-a99c88c144c3",
+              "description": "G3",
+              "inputs": [
+                {
+                  "name": "valFromParam",
+                  "mediatype": ["string"],
+                  "type": "parameter"
+                },
+                {
+                  "name": "valFromArtifact",
+                  "mediatype": ["string"],
+                  "type": "artifact"
+                },
+                { "name": "secretPASS", "type": "env_secret" }
+              ],
+              "type": "component",
+              "implementation": {
+                "type": "graph",
+                "inputMappings": [
+                  {
+                    "source": { "port": "valFromParam" },
+                    "target": { "node": "N4G3B1", "port": "valParam" }
+                  },
+                  {
+                    "source": { "port": "valFromArtifact" },
+                    "target": { "node": "N4G3B2", "port": "valArtifact" }
+                  },
+                  {
+                    "source": { "port": "secretPASS" },
+                    "target": { "node": "N4G3B1", "port": "secretPASS" }
+                  }
+                ],
+                "nodes": [
+                  {
+                    "id": "N4G3B1",
+                    "node": {
+                      "uid": "192161d7-e3f2-4991-adc0-a99c88c144b4",
+                      "description": "B4",
+                      "inputs": [
+                        {
+                          "name": "valParam",
+                          "mediatype": ["string"],
+                          "type": "parameter"
+                        },
+                        { "name": "secretPASS", "type": "env_secret" }
+                      ],
+                      "type": "component",
+                      "implementation": {
+                        "type": "brick",
+                        "container": {
+                          "name": "containername",
+                          "image": "alpine:latest",
+                          "command": [
+                            "sh",
+                            "-c",
+                            "echo secret $secretPASS; echo parameter \"$0\""
+                          ]
+                        },
+                        "args": [
+                          {
+                            "source": { "port": "valParam" },
+                            "target": { "type": "parameter" }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "id": "N4G3B2",
+                    "node": {
+                      "uid": "192161d7-e3f2-4991-adc0-a99c88c144b5",
+                      "description": "B5",
+                      "inputs": [
+                        {
+                          "name": "valArtifact",
+                          "mediatype": ["string"],
+                          "type": "artifact"
+                        }
+                      ],
+                      "type": "component",
+                      "implementation": {
+                        "type": "brick",
+                        "container": {
+                          "name": "containername",
+                          "image": "python:latest",
+                          "command": ["python", "-m", "pip", "install"]
+                        },
+                        "args": [
+                          {
+                            "source": { "port": "valArtifact" },
+                            "target": {
+                              "type": "artifact",
+                              "prefix": "--requirement="
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [
+          {
+            "source": { "node": "N2", "port": "value" },
+            "target": { "node": "N4", "port": "valFromParam" }
+          },
+          {
+            "source": { "node": "N2", "port": "artifactVal" },
+            "target": { "node": "N4", "port": "valFromArtifact" }
+          }
+        ]
+      }
+    }
+  }
+}

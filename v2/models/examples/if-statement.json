@@ -1,0 +1,155 @@
+{
+  "description": "Conditional example",
+  "type": "job",
+  "inputValues": [
+    {
+      "value": "10",
+      "target": "max"
+    }
+  ],
+  "workflow": {
+    "name": "wf-example",
+    "description": "Test workflow with an if statement example",
+    "type": "workflow",
+    "workspace": "argo",
+    "component": {
+      "uid": "192161d7-e3f2-4991-adc0-a99c88c144c0",
+      "description": "Graph component",
+      "inputs": [
+        { "name": "max", "mediatype": ["integer"], "type": "parameter" }
+      ],
+      "outputs": [{ "name": "description", "type": "parameter" }],
+      "type": "component",
+      "implementation": {
+        "type": "graph",
+        "inputMappings": [
+          {
+            "source": { "port": "max" },
+            "target": { "node": "N1", "port": "value" }
+          }
+        ],
+        "outputMappings": [
+          {
+            "source": { "node": "If", "port": "ifOut" },
+            "target": { "port": "description" }
+          }
+        ],
+        "nodes": [
+          {
+            "id": "N1",
+            "node": {
+              "uid": "192161d7-e3f2-4991-adc0-a99c88c144b0",
+              "description": "Generate",
+              "inputs": [{ "name": "value", "type": "parameter" }],
+              "outputs": [{ "name": "rand", "type": "parameter" }],
+              "type": "component",
+              "implementation": {
+                "type": "brick",
+                "container": {
+                  "name": "containername_n1_b1",
+                  "image": "bash:latest",
+                  "command": ["bash", "-c", "shuf -i 0-$0 -n1 > /tmp/out"]
+                },
+                "args": [
+                  {
+                    "source": { "port": "value" },
+                    "target": { "type": "parameter" }
+                  }
+                ],
+                "results": [
+                  {
+                    "source": { "file": "/tmp/out" },
+                    "target": { "port": "rand" }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "If",
+            "node": {
+              "uid": "192161d7-e3f2-4991-adc0-a99c88c144c2",
+              "description": "If/else component",
+              "inputs": [
+                {
+                  "name": "valFromParam",
+                  "mediatype": ["number"],
+                  "type": "parameter"
+                }
+              ],
+              "outputs": [{ "name": "ifOut", "type": "parameter" }],
+              "type": "component",
+              "implementation": {
+                "type": "conditional",
+                "inputMappings": [
+                  {
+                    "source": { "port": "valFromParam" },
+                    "target": { "port": "valParam" }
+                  }
+                ],
+                "outputMappings": [
+                  {
+                    "source": { "node": "nodeTrue", "port": "out" },
+                    "target": { "port": "ifOut" }
+                  }
+                ],
+                "nodeTrue": {
+                  "uid": "192161d7-e3f2-4991-adc0-a99c88c144b4",
+                  "description": "",
+                  "inputs": [
+                    {
+                      "name": "valParam",
+                      "mediatype": ["number"],
+                      "type": "parameter"
+                    }
+                  ],
+                  "outputs": [{ "name": "out", "type": "parameter" }],
+                  "type": "component",
+                  "implementation": {
+                    "type": "brick",
+                    "container": {
+                      "name": "containername",
+                      "image": "alpine:latest",
+                      "command": [
+                        "sh",
+                        "-c",
+                        "echo value $0 is huge > /tmp/out"
+                      ]
+                    },
+                    "args": [
+                      {
+                        "source": { "port": "valParam" },
+                        "target": { "type": "parameter" }
+                      }
+                    ],
+                    "results": [
+                      {
+                        "source": { "file": "/tmp/out" },
+                        "target": { "port": "out" }
+                      }
+                    ]
+                  }
+                },
+                "expression": {
+                  "left": {
+                    "name": "valFromParam",
+                    "mediatype": ["number"],
+                    "type": "parameter"
+                  },
+                  "operator": ">=",
+                  "right": "5"
+                }
+              }
+            }
+          }
+        ],
+        "edges": [
+          {
+            "source": { "node": "N1", "port": "rand" },
+            "target": { "node": "If", "port": "valFromParam" }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "uid": {
+      "$ref": "cref.schema.json"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "volume": {
+      "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/v1.21.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.Volume"
+    }
+  },
+  "additionalProperties": false,
+  "required": ["volume", "workspace"]
+}

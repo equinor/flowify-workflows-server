@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "allOf": [{ "$ref": "metadata.schema.json" }],
+  "properties": {
+    "type": {
+      "type": "string",
+      "pattern": "^job$"
+    },
+    "inputValues": {
+      "description": "The list of values for workflow inputs.",
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "value.schema.json"
+      }
+    },
+    "workflow": {
+      "$ref": "workflow.schema.json"
+    }
+  },
+  "unevaluatedProperties": false,
+  "required": ["type", "workflow"]
+}

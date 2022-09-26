@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "metadataworkspace.schema.json"
+      }
+    },
+    "pageInfo": {
+      "$ref": "pageinfo.schema.json"
+    }
+  }
+}

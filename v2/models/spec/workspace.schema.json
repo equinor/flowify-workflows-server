@@ -1,0 +1,36 @@
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "The name of the workspace",
+      "type": "string"
+    },
+    "hasAccess": {
+      "description": "Is access granted?",
+      "type": "boolean"
+    },
+    "missingRoles": {
+      "description": "The roles a user needs in order to get access.",
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "The name of the missing role",
+              "type": "string"
+            },
+            "description": {
+              "description": "The description of the missing role",
+              "type": "string"
+            }
+          }
+        } 
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": ["name", "hasAccess", "missingRoles"]
+}

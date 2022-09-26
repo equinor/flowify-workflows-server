@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "modifiedBy": {
+      "type": "string"
+    },
+    "uid": {
+      "type": "string"
+    },
+    "previous": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "workspace": {
+      "type": "string"
+    }
+  }
+}

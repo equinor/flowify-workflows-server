@@ -1,0 +1,51 @@
+{
+  "description": "A brick component with an input parameter",
+  "inputs": [
+    { "name": "greeting", "mediatype": ["string"], "type": "parameter" },
+    { "name": "sender", "mediatype": ["string"], "type": "parameter" }
+  ],
+  "type": "component",
+  "implementation": {
+    "type": "brick",
+    "container": {
+      "name": "anyname",
+      "image": "docker/whalesay",
+      "command": ["cowsay"],
+      "args": [
+        "Hello static I will be appended (TBD?) by potentially variable flowify-args"
+      ]
+    },
+    "args": [
+      {
+        "source": "Hello static text.",
+        "description": "A static argument"
+      },
+      {
+        "source": { "port": "greeting" },
+        "target": { "type": "env_secret" },
+        "description": "A variable stored in env $(GREET) and expanded by k8s upon execution"
+      },
+      {
+        "source": { "port": "sender" },
+        "target": { "type": "parameter" }
+      },
+      {
+        "source": { "port": "sender" },
+        "target": { "type": "file" },
+        "description": "A variable stored as an argo artefact in /tmp/sender"
+      }
+    ],
+    "results": [
+      {
+        "source": "Hello static text.",
+        "target": { "port": "outputport" },
+        "description": "A static result, eg for mocking"
+      },
+      {
+        "source": { "file": "/tmp/res.txt" },
+        "target": { "port": "outputport" },
+        "description": "A result from file mapped to component output interface"
+      }
+    ]
+  }
+}

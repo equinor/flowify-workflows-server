@@ -1,0 +1,36 @@
+{
+  "description": "An map component",
+  "version": {
+    "current": 5,
+    "tags": ["tag1", "tag2"],
+    "previous": {
+      "version": 10,
+      "uid": "192161d7-e3f2-4991-adc0-a99c88c144c0"
+    }
+  },
+  "type": "component",
+  "implementation": {
+    "type": "map",
+    "node": {
+      "description": "A brick component",
+      "version": {
+        "current": 1,
+        "tags": ["tag3", "tag2"],
+        "previous": {
+          "version": 0
+        }
+      },
+      "type": "component",
+      "implementation": {
+        "type": "brick",
+        "container": {
+          "name": "containername",
+          "image": "docker/whalesay",
+          "command": ["cowsay"],
+          "args": ["Hello Test"]
+        }
+      }
+    }
+  }
+}
+  

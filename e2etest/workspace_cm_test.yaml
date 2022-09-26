@@ -1,0 +1,32 @@
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    labels:
+        app.kubernetes.io/component: workspace-config
+        app.kubernetes.io/part-of: flowify
+    name: test-no-access
+    namespace: test
+data:
+    roles: "[\"role-x\", \"role-y\", \"role-z\"]"
+    projectName: test-no-access
+    description: >
+        The e2e injected token should not be able to read/write to this workspace
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    labels:
+        app.kubernetes.io/component: workspace-config
+        app.kubernetes.io/part-of: flowify
+    name: test
+    namespace: test
+data:
+    roles: "[[\"role-x\"], [\"role-y\"]]"
+    projectName: test
+    description: bla
+    hideForUnauthorized: "false"
+    serviceAccountName: default

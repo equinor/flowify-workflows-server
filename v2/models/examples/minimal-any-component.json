@@ -1,0 +1,7 @@
+{
+  "description": "Smallest possible component uses the any implementation",
+  "type": "component",
+  "implementation": {
+    "type": "any"
+  }
+}

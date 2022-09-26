@@ -1,0 +1,13 @@
+{
+  "description": "A brick component",
+  "type": "component",
+  "implementation": {
+    "type": "brick",
+    "container": {
+      "name": "containername",
+      "image": "docker/whalesay",
+      "command": ["cowsay"],
+      "args": ["Hello Test"]
+    }
+  }
+}

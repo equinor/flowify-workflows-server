@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "component": {
+      "$ref": "component.schema.json"
+    },
+    "options": {
+      "description": "Unspecified for future needs",
+      "type": "object"
+    }
+  },
+  "unevaluatedProperties": false,
+  "required": ["component"]
+}

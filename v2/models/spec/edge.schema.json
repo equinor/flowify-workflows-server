@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "source": {
+      "$ref": "port.schema.json"
+    },
+    "target": {
+      "$ref": "port.schema.json"
+    }
+  },
+  "additionalProperties": false,
+  "required": ["source", "target"]
+}

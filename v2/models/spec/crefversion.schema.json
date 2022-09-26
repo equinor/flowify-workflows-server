@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "minimum": 0
+    },
+    "uid": {
+      "$ref": "cref.schema.json"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "job": {
+      "$ref": "job.schema.json"
+    },
+    "options": {
+      "description": "Unspecified for future needs",
+      "type": "object"
+    }
+  },
+  "unevaluatedProperties": false,
+  "required": ["job"]
+}

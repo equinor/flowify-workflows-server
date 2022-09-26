@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "properties": {
+    "current": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "previous": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "number",
+          "minimum": 0
+        },
+        "uid": {
+          "$ref": "cref.schema.json"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "totalNumber": {
+      "type": "number"
+    },
+    "limit": {
+      "type": "number"
+    },
+    "skip": {
+      "type": "number"
+    }
+  },
+  "required": ["totalNumber", "limit", "skip"],
+  "additionalItems": false
+}

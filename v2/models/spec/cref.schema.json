@@ -1,0 +1,6 @@
+{
+  "type": "string",
+  "format": "uuid",
+  "description": "A FlowifyObjectReference is any object inside the workflow graph that can accept and/or output a dataflow object.",
+  "example": "44763f88-7f51-11ec-a8a3-0242ac120002"
+}

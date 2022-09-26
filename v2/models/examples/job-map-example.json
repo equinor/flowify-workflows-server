@@ -1,0 +1,100 @@
+{
+    "description": "Job example",
+    "type": "job",
+    "inputValues": [
+        {
+            "value": "6",
+            "target": "numParts"
+        },
+        {
+            "value": "SECRET_PASS",
+            "target": "secretL1" 
+        },
+        {
+            "value": ["A", "B"],
+            "target": "branch"
+        }
+    ],
+    "workflow":
+    {
+        "name": "wf-example",
+		"description": "Test workflow with an map example",
+		"type": "workflow",
+		"workspace": "argo",
+        "component":
+        {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144c0",
+            "description": "Map component",
+            "inputs": [
+                { "name": "numParts", "type": "parameter" },
+                { "name": "secretL1", "type": "env_secret" },
+                { "name": "branch", "type": "parameter_array" }
+            ],
+            "outputs": [
+                { "name": "outputParamArray", "type": "parameter_array" }
+            ],
+            "type": "component",
+            "implementation": {
+                "type": "map",
+                "inputMappings": [
+                    {
+                        "source": { "port": "numParts" },
+                        "target": { "port": "inputParam" }
+                    },
+                    {
+                        "source": { "port": "branch" },
+                        "target": { "port": "val" }
+                    },
+                    {
+                        "source": { "port": "secretL1" },
+                        "target": { "port": "inputScrt" }
+                    }
+                ],
+                "outputMappings": [
+                    {
+                        "source": { "port": "output" },
+                        "target": { "port": "outputParamArray" }
+                    }
+                ],
+                "node": {
+                    "uid": "192161d7-e3f2-4991-adc0-a99c88c144b2",
+                    "description": "MapNode1",
+                    "inputs": [
+                        { "name": "inputParam", "type": "parameter" },
+                        { "name": "val", "type": "parameter" },
+                        { "name": "inputScrt", "type": "env_secret" }
+                    ],
+                    "outputs": [
+                        { "name": "output", "type": "parameter_array" }
+                    ],
+                    "type": "component",
+                    "implementation": {
+                        "type": "brick",
+                        "container": {
+                            "name": "containername_n1_b1",
+                            "image": "alpine:latest",
+                            "command": ["sh", "-c", "echo $inputScrt; ARR=\"[\"; for i in $(seq $0); do ARR=$ARR\\\"$1$i\\\"\", \" ; done; ARR=${ARR%??}\"]\"; echo $ARR | tee /tmp/prm"],
+                            "args": []
+                        },
+                        "args": [
+                            {
+                                "source": { "port": "inputParam" },
+                                "target": { "type": "parameter" }
+                            },
+                            {
+                                "source": { "port": "val" },
+                                "target": { "type": "parameter" }
+                            }
+                        ],
+                        "results": [
+                            {
+                                "source": { "file": "/tmp/prm" },
+                                "target": { "port": "output" }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,363 @@
+{
+    "uid": "192161d7-e3f2-4991-adc0-a99c88c144c0",
+    "description": "My cool workflow",
+    "inputs": [{ "name": "seedT", "mediatype": ["integer"], "type": "parameter" }],
+    "outputs": [],
+    "type": "component",
+    "implementation": {
+      "type": "graph",
+      "inputMappings": [
+        {
+          "source": { "port": "seedT" },
+          "target": { "node": "N1", "port": "seedN1" }
+        }
+      ],
+      "nodes": [
+        {
+          "id": "N1",
+          "node": {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b1",
+            "description": "B1",
+            "inputs": [{ "name": "seedN1", "mediatype": ["integer"], "type": "parameter" }],
+            "outputs": [{ "name": "value", "mediatype": ["integer"], "type": "parameter" }],
+            "type": "component",
+            "implementation": {
+              "type": "brick",
+              "container": {
+                "name": "randgen",
+                "image": "alpine:latest",
+                "command": ["sh", "-c"],
+                "args": []
+              },
+              "args": [
+                { "source": "sleep 1; " },
+                { "source": "RANDOM=" },
+                {
+                  "source": { "port": "seedN1" },
+                  "target": { "type": "parameter", "name": "seed" }
+                },
+                {
+                  "source": "; RAND_INT=$((1 + RANDOM % 10)); echo $RAND_INT | tee /tmp/output"
+                }
+              ],
+              "results": [
+                {
+                  "source": { "file": "/tmp/output" },
+                  "target": { "port": "value" }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "N2",
+          "node": {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b2",
+            "description": "B2",
+            "inputs": [{ "name": "value", "mediatype": ["integer"], "type": "parameter" }],
+            "outputs": [{ "name": "value", "mediatype": ["integer"], "type": "parameter" }],
+            "type": "component",
+            "implementation": {
+              "type": "brick",
+              "container": {
+                "name": "ink",
+                "image": "alpine:latest",
+                "command": ["sh", "-c"],
+                "args": []
+              },
+              "args": [
+                { "source": "expr " },
+                {
+                  "source": { "port": "value" },
+                  "target": { "type": "parameter", "name": "x" }
+                },
+                { "source": " + 1 | tee /tmp/incd" }
+              ],
+              "results": [
+                {
+                  "source": { "file": "/tmp/incd" },
+                  "target": { "port": "value" }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "N3",
+          "node": {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b3",
+            "description": "B3",
+            "inputs": [{ "name": "value", "mediatype": ["integer"], "type": "parameter" }],
+            "outputs": [{ "name": "valueON3", "mediatype": ["integer"], "type": "parameter" }],
+            "type": "component",
+            "implementation": {
+              "type": "brick",
+              "container": {
+                "name": "ink",
+                "image": "alpine:latest",
+                "command": ["sh", "-c"],
+                "args": []
+              },
+              "args": [
+                { "source": "expr " },
+                {
+                  "source": { "port": "value" },
+                  "target": { "type": "parameter", "name": "x" }
+                },
+                { "source": " + 1 | tee /tmp/incd" }
+              ],
+              "results": [
+                {
+                  "source": { "file": "/tmp/incd" },
+                  "target": { "port": "valueON3" }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "N4",
+          "node": {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b4",
+            "description": "B4",
+            "inputs": [{ "name": "value", "mediatype": ["integer"], "type": "parameter" }],
+            "outputs": [{ "name": "valueON4", "mediatype": ["integer"], "type": "parameter" }],
+            "type": "component",
+            "implementation": {
+              "type": "brick",
+              "container": {
+                "name": "ink",
+                "image": "alpine:latest",
+                "command": ["sh", "-c"],
+                "args": []
+              },
+              "args": [
+                { "source": "expr " },
+                {
+                  "source": { "port": "value" },
+                  "target": { "type": "parameter", "name": "x" }
+                },
+                { "source": " + 1 | tee /tmp/incd" }
+              ],
+              "results": [
+                {
+                  "source": { "file": "/tmp/incd" },
+                  "target": { "port": "valueON4" }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "N5",
+          "node": {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b5",
+            "description": "B5",
+            "inputs": [
+              { "name": "first", "mediatype": ["integer"], "type": "parameter" },
+              { "name": "second", "mediatype": ["integer"], "type": "parameter" }
+            ],
+            "outputs": [{ "name": "sum", "mediatype": ["integer"], "type": "parameter" }],
+            "type": "component",
+            "implementation": {
+              "type": "brick",
+              "container": {
+                "name": "add",
+                "image": "alpine:latest",
+                "command": ["sh", "-c"],
+                "args": []
+              },
+              "args": [
+                { "source": "expr " },
+                {
+                  "source": { "port": "first" },
+                  "target": { "type": "parameter", "name": "a" }
+                },
+                { "source": " + " },
+                {
+                  "source": { "port": "second" },
+                  "target": { "type": "parameter", "name": "b" }
+                },
+                { "source": " | tee /tmp/inc" }
+              ],
+              "results": [
+                {
+                  "source": { "file": "/tmp/inc" },
+                  "target": { "port": "sum" }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "N6",
+          "node": {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b6",
+            "description": "B6",
+            "inputs": [{ "name": "value", "mediatype": ["integer"], "type": "parameter" }],
+            "outputs": [{ "name": "value", "mediatype": ["integer"], "type": "parameter" }],
+            "type": "component",
+            "implementation": {
+              "type": "brick",
+              "container": {
+                "name": "ink",
+                "image": "alpine:latest",
+                "command": ["sh", "-c"],
+                "args": []
+              },
+              "args": [
+                { "source": "expr " },
+                {
+                  "source": { "port": "value" },
+                  "target": { "type": "parameter", "name": "x" }
+                },
+                { "source": " + 1 | tee /tmp/incd" }
+              ],
+              "results": [
+                {
+                  "source": { "file": "/tmp/incd" },
+                  "target": { "port": "value" }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "N7",
+          "node": {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b7",
+            "description": "B7",
+            "inputs": [{ "name": "msg", "mediatype": ["string"], "type": "parameter" }],
+            "outputs": [],
+            "type": "component",
+            "implementation": {
+              "type": "brick",
+              "container": {
+                "name": "containername",
+                "image": "docker/whalesay",
+                "command": ["cowsay"],
+                "args": []
+              },
+              "args": [
+                {
+                  "source": { "port": "msg" },
+                  "target": { "type": "parameter", "name": "v" }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "N8",
+          "node": {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b8",
+            "description": "B8",
+            "inputs": [
+              { "name": "first", "mediatype": ["integer"], "type": "parameter" },
+              { "name": "second", "mediatype": ["integer"], "type": "parameter" }
+            ],
+            "outputs": [{ "name": "sum", "mediatype": ["integer"], "type": "parameter" }],
+            "type": "component",
+            "implementation": {
+              "type": "brick",
+              "container": {
+                "name": "add",
+                "image": "alpine:latest",
+                "command": ["sh", "-c"],
+                "args": []
+              },
+              "args": [
+                { "source": "expr " },
+                {
+                  "source": { "port": "first" },
+                  "target": { "type": "parameter", "name": "a" }
+                },
+                { "source": " + " },
+                {
+                  "source": { "port": "second" },
+                  "target": { "type": "parameter", "name": "b" }
+                },
+                { "source": " | tee /tmp/inc" }
+              ],
+              "results": [
+                {
+                  "source": { "file": "/tmp/inc" },
+                  "target": { "port": "sum" }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "N9",
+          "node": {
+            "uid": "192161d7-e3f2-4991-adc0-a99c88c144b9",
+            "description": "B7",
+            "inputs": [{ "name": "msg", "mediatype": ["string"], "type": "parameter" }],
+            "outputs": [],
+            "type": "component",
+            "implementation": {
+              "type": "brick",
+              "container": {
+                "name": "containername",
+                "image": "docker/whalesay",
+                "command": ["cowsay"],
+                "args": []
+              },
+              "args": [
+                {
+                  "source": { "port": "msg" },
+                  "target": { "type": "parameter", "name": "v" }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "source": { "node": "N1", "port": "value" },
+          "target": { "node": "N2", "port": "value" }
+        },
+        {
+          "source": { "node": "N1", "port": "value" },
+          "target": { "node": "N3", "port": "value" }
+        },
+        {
+          "source": { "node": "N1", "port": "value" },
+          "target": { "node": "N4", "port": "value" }
+        },
+        {
+          "source": { "node": "N2", "port": "value" },
+          "target": { "node": "N5", "port": "first" }
+        },
+        {
+          "source": { "node": "N3", "port": "valueON3" },
+          "target": { "node": "N5", "port": "second" }
+        },
+        {
+          "source": { "node": "N4", "port": "valueON4" },
+          "target": { "node": "N6", "port": "value" }
+        },
+        {
+          "source": { "node": "N5", "port": "sum" },
+          "target": { "node": "N7", "port": "msg" }
+        },
+        {
+          "source": { "node": "N5", "port": "sum" },
+          "target": { "node": "N8", "port": "first" }
+        },
+        {
+          "source": { "node": "N6", "port": "value" },
+          "target": { "node": "N8", "port": "second" }
+        },
+        {
+          "source": { "node": "N8", "port": "sum" },
+          "target": { "node": "N9", "port": "msg" }
+        }
+      ]
+    }
+  }
+    
+  
+  

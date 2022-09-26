@@ -1,0 +1,21 @@
+{
+  "name": "hello-world-workflow",
+  "description": "A hello world workflow (with an inline component)",
+  "type": "workflow",
+  "component": {
+    "description": "A hello world component",
+    "inputs": [],
+    "outputs": [],
+    "type": "component",
+    "implementation": {
+      "type": "brick",
+      "container": {
+        "name": "saycontainer",
+        "image": "docker/whalesay",
+        "command": ["cowsay"],
+        "args": ["hello world"]
+      }
+    }
+  },
+  "workspace": "test"
+}

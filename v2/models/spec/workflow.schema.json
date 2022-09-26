@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "allOf": [{ "$ref": "metadata.schema.json" }],
+  "properties": {
+    "type": {
+      "type": "string",
+      "pattern": "^workflow$"
+    },
+    "component": {
+      "$ref": "component.schema.json"
+    },
+    "workspace": {
+      "type": "string"
+    }
+  },
+  "unevaluatedProperties": false,
+  "required": ["type", "component", "workspace"]
+}

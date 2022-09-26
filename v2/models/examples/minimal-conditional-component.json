@@ -1,0 +1,32 @@
+{
+  "description": "If/else component",
+  "type": "component",
+  "implementation": {
+    "type": "conditional",
+    "nodeTrue": {
+      "description": "",
+      "type": "component",
+      "implementation": {
+        "type": "brick",
+        "container": {
+          "name": "containername",
+          "image": "alpine:latest",
+          "command": ["sh"]
+        }
+      }
+    },
+    "nodeFalse": {
+      "version": 2,
+      "uid": "44763f88-7f51-11ec-a8a3-0242ac120002"
+    },
+    "expression": {
+      "left": {
+        "name": "valFromParam",
+        "mediatype": ["number"],
+        "type": "parameter"
+      },
+      "operator": ">=",
+      "right": "5"
+    }
+  }
+}

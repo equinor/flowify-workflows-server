@@ -1,0 +1,28 @@
+{
+    "type": "object",
+    "properties": {
+      "left": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "$ref": "data.schema.json"
+          }
+        ]
+      },
+      "right": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "$ref": "data.schema.json"
+          }
+        ]
+      },
+      "operator": {
+        "type": "string",
+        "pattern": "^(==|!=|<|>|<=|>=)$"
+      }
+    },
+    "additionalProperties": false,
+    "required": ["left", "right", "operator"]
+  }
+  

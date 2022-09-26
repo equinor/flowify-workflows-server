@@ -1,0 +1,202 @@
+{
+  "type": "job",
+  "uid": "00000000-0000-0000-0000-000000000001",
+  "description": "A job volume data passing between bricks",
+  "inputValues": [{ "value": "{\"name\":\"vol-config\"}", "target": "mount" }],
+  "workflow": {
+    "uid": "00000000-0000-0000-0000-000000000002",
+    "component": {
+      "type": "component",
+      "uid": "00000000-0000-0000-0000-000000000003",
+      "inputs": [{ "name": "mount", "type": "volume" }],
+      "implementation": {
+        "type": "graph",
+        "inputMappings": [
+          {
+            "source": { "port": "mount" },
+            "target": { "node": "A", "port": "greeting" }
+          }
+        ],
+        "nodes": [
+          {
+            "id": "A",
+            "node": {
+              "uid": "00000000-0000-0000-0000-000000000004",
+              "type": "component",
+              "inputs": [{ "name": "greeting", "type": "volume" }],
+              "outputs": [{ "name": "message", "type": "volume" }],
+              "implementation": {
+                "type": "brick",
+                "container": {
+                  "name": "name",
+                  "image": "busybox",
+                  "command": ["cat"]
+                },
+                "args": [
+                  {
+                    "target": {
+                      "type": "volume",
+                      "prefix": "/opt/volumes/"
+                    },
+                    "source": { "port": "greeting" }
+                  },
+                  {
+                    "source": "/opt/volumes/greeting/message.txt"
+                  }
+                ],
+                "results": [
+                  {
+                    "source": { "volume": "greeting" },
+                    "target": { "port": "message" }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "B",
+            "node": {
+              "uid": "00000000-0000-0000-0000-000000000005",
+              "type": "component",
+              "inputs": [{ "name": "message", "type": "volume" }],
+              "outputs": [{ "name": "message", "type": "volume" }],
+              "implementation": {
+                "type": "graph",
+                "inputMappings": [
+                  {
+                    "source": { "port": "message" },
+                    "target": { "node": "Aa", "port": "in" }
+                  }
+                ],
+                "outputMappings": [
+                  {
+                    "source": { "node": "Ab", "port": "out-b" },
+                    "target": { "port": "message" }
+                  }
+                ],
+                "nodes": [
+                  {
+                    "id": "Aa",
+                    "node": {
+                      "type": "component",
+                      "uid": "00000000-0000-0000-0000-0000000000a5",
+                      "inputs": [{ "name": "in", "type": "volume" }],
+                      "outputs": [{ "name": "out", "type": "volume" }],
+                      "implementation": {
+                        "type": "brick",
+                        "container": {
+                          "name": "name",
+                          "image": "busybox",
+                          "command": ["cat"]
+                        },
+                        "args": [
+                          {
+                            "target": {
+                              "type": "volume",
+                              "prefix": "/opt/volumes/"
+                            },
+                            "source": { "port": "in" }
+                          },
+                          {
+                            "source": " /opt/volumes/in/text.txt"
+                          }
+                        ],
+                        "results": [
+                          {
+                            "source": { "volume": "in" },
+                            "target": { "port": "out" }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "id": "Ab",
+                    "node": {
+                      "type": "component",
+                      "uid": "00000000-0000-0000-0000-0000000000b5",
+                      "inputs": [{ "name": "in-b", "type": "volume" }],
+                      "outputs": [{ "name": "out-b", "type": "volume" }],
+                      "implementation": {
+                        "type": "brick",
+                        "container": {
+                          "name": "name",
+                          "image": "busybox",
+                          "command": ["cat"]
+                        },
+                        "args": [
+                          {
+                            "target": {
+                              "type": "volume",
+                              "prefix": "/opt/volumes/"
+                            },
+                            "source": { "port": "in-b" }
+                          },
+                          {
+                            "source": " /opt/volumes/in-b/text.txt"
+                          }
+                        ],
+                        "results": [
+                          {
+                            "source": { "volume": "in-b" },
+                            "target": { "port": "out-b" }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "edges": [
+                  {
+                    "source": { "node": "Aa", "port": "out" },
+                    "target": { "node": "Ab", "port": "in-b" }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "C",
+            "node": {
+              "uid": "00000000-0000-0000-0000-000000000006",
+              "type": "component",
+              "inputs": [{ "name": "msg", "type": "volume" }],
+              "implementation": {
+                "type": "brick",
+                "container": {
+                  "name": "name",
+                  "image": "busybox",
+                  "command": ["cat"]
+                },
+                "args": [
+                  {
+                    "target": {
+                      "type": "volume",
+                      "prefix": "/opt/volumes/"
+                    },
+                    "source": { "port": "msg" }
+                  },
+                  {
+                    "source": " /opt/volumes/msg/message.txt"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "edges": [
+          {
+            "source": { "node": "A", "port": "message" },
+            "target": { "node": "B", "port": "message" }
+          },
+          {
+            "source": { "node": "B", "port": "message" },
+            "target": { "node": "C", "port": "msg" }
+          }
+        ]
+      }
+    },
+    "type": "workflow",
+    "workspace": "test"
+  }
+}

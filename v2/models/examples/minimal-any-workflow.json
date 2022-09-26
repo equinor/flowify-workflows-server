@@ -1,0 +1,13 @@
+{
+  "name": "miny-wf",
+  "description": "A minimal workflow with an inline any-component",
+  "type": "workflow",
+  "component": {
+    "description": "Smallest possible component uses the any implementation",
+    "type": "component",
+    "implementation": {
+      "type": "any"
+    }
+  },
+  "workspace": "test"
+}

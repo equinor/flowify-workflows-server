@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "port": {
+      "type": "string"
+    },
+    "node": {
+      "type": "string"
+    }
+  },
+  "required": ["port"]
+}

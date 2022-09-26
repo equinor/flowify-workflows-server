@@ -1,0 +1,53 @@
+{
+  "description": "An single node graph component",
+  "inputs": [
+    { "name": "greeting", "mediatype": ["string"], "type": "parameter" },
+    { "name": "sender", "mediatype": ["string"], "type": "parameter" }
+  ],
+  "type": "component",
+  "implementation": {
+    "type": "graph",
+    "inputMappings": [
+      {
+        "source": { "port": "greeting" },
+        "target": { "node": "greeter", "port": "greeting" }
+      }
+    ],
+    "nodes": [
+      {
+        "id": "greeter-node",
+        "node": {
+          "description": "A brick component",
+          "inputs": [
+            { "name": "greeting", "mediatype": ["string"], "type": "parameter" }
+          ],
+          "type": "component",
+          "implementation": {
+            "type": "brick",
+            "container": {
+              "name": "containername",
+              "image": "docker/whalesay",
+              "command": ["cowsay"],
+              "args": ["Hello Test!"]
+            },
+            "args": [
+              {
+                "source": "Hello static text.",
+                "description": "A static argument"
+              },
+              {
+                "source": { "port": "GREETING" },
+                "target": { "type": "env", "name": "GREET" },
+                "description": "A variable stored in env $(GREET) and expanded by k8s upon execution"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "responder-node",
+        "node": "44763f88-7f51-11ec-a8a3-0242ac120002"
+      }
+    ]
+  }
+}

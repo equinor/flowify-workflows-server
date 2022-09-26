@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "pattern": "^graph$"
+    },
+    "nodes": {
+      "type": "array",
+      "description": "The component-nodes of the graph, either inline or references to external storage",
+      "items": {
+        "$ref": "node.schema.json"
+      }
+    },
+    "edges": {
+      "description": "The topology of the graph",
+      "type": "array",
+      "items": {
+        "$ref": "edge.schema.json"
+      }
+    },
+    "inputMappings": {
+      "description": "The mapping of input ports to individual graph-node ports",
+      "type": "array",
+      "items": {
+        "$ref": "mapping.schema.json"
+      }
+    },
+    "outputMappings": {
+      "description": "The mapping of graph node-ports to component interface ports",
+      "type": "array",
+      "items": {
+        "$ref": "mapping.schema.json"
+      }
+    }
+  },
+  "required": ["type"],
+  "additionalProperties": false
+}

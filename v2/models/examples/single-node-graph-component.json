@@ -1,0 +1,26 @@
+{
+  "description": "An single node graph component",
+  "inputs": [{ "name": "greeting", "type": "parameter" }],
+  "type": "component",
+  "implementation": {
+    "type": "graph",
+    "nodes": [
+      {
+        "id": "A",
+        "node": {
+          "description": "A brick component",
+          "type": "component",
+          "implementation": {
+            "type": "brick",
+            "container": {
+              "name": "containername",
+              "image": "docker/whalesay",
+              "command": ["cowsay"],
+              "args": ["hello world"]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

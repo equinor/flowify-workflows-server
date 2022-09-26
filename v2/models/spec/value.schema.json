@@ -1,0 +1,25 @@
+{
+    "type": "object",
+    "properties": {
+      "value": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": false,
+            "items": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "target": {
+        "type": "string"
+      }
+    },
+    "required": ["value", "target"]
+  }
+  

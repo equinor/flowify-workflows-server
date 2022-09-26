@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "pattern": "^conditional$"
+    },
+    "nodeTrue": {
+      "oneOf": [
+        {
+          "$ref": "cref.schema.json"
+        },
+        {
+          "$ref": "crefversion.schema.json"
+        },
+        {
+          "$ref": "component.schema.json"
+        }
+      ]
+    },
+    "nodeFalse": {
+      "oneOf": [
+        {
+          "$ref": "cref.schema.json"
+        },
+        {
+          "$ref": "crefversion.schema.json"
+        },
+        {
+          "$ref": "component.schema.json"
+        }
+      ]
+    },
+    "expression": {
+      "$ref": "expression.schema.json"
+    },
+    "inputMappings": {
+      "description": "The mapping of input ports to individual graph-node ports",
+      "type": "array",
+      "items": {
+        "$ref": "mapping.schema.json"
+      }
+    },
+    "outputMappings": {
+      "description": "The mapping of graph node-ports to component interface ports",
+      "type": "array",
+      "items": {
+        "$ref": "mapping.schema.json"
+      }
+    }
+  },
+  "required": ["type", "nodeTrue", "expression"],
+  "additionalProperties": false
+}

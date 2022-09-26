@@ -1,0 +1,16 @@
+{
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "type": {
+            "type": "string",
+            "pattern": "^(parameter|artifact)$"
+        },
+        "userdata": {
+            "type": "object",
+            "description": "An opaque field for frontend applications, never touched by the backend"
+        }
+    }
+}

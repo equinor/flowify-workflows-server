@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "email": {
+      "description": "The users email address",
+      "type": "string",
+      "format": "email"
+    },
+    "name": {
+      "description": "The name of the user.",
+      "type": "string"
+    },
+    "roles": {
+      "description": "The roles the user is assigned.",
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "schema": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": ["email", "name", "roles"]
+}

@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "pattern": "^brick$"
+    },
+    "container": {
+      "$ref": "https://raw.githubusercontent.com/kubernetes/kubernetes/v1.21.2/api/openapi-spec/swagger.json#/definitions/io.k8s.api.core.v1.Container"
+    },
+    "args": {
+      "type": "array",
+      "description": "An array of arguments that are appended to the k8s container.args above",
+      "items": { "$ref": "arg.schema.json" }
+    },
+    "results": {
+      "type": "array",
+      "description": "An array of results that are mapped to the component output interface",
+      "items": { "$ref": "res.schema.json" }
+    }
+  },
+  "additionalProperties": false,
+  "required": ["type", "container"]
+}

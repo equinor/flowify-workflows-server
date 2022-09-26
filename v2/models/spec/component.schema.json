@@ -1,0 +1,49 @@
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "pattern": "^component$"
+    },
+    "inputs": {
+      "description": "The output interface; the data objects going out.",
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "data.schema.json"
+      }
+    },
+    "outputs": {
+      "description": "The input interface; the data objects going in.",
+      "type": "array",
+      "minItems": 0,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "data.schema.json"
+      }
+    },
+    "implementation": {
+      "oneOf": [
+        {
+          "$ref": "any.schema.json"
+        },
+        {
+          "$ref": "brick.schema.json"
+        },
+        {
+          "$ref": "graph.schema.json"
+        },
+        {
+          "$ref": "map.schema.json"
+        },
+        {
+          "$ref": "conditional.schema.json"
+        }
+      ]
+    }
+  },
+  "allOf": [{ "$ref": "metadata.schema.json" }],
+  "unevaluatedProperties": false,
+  "required": ["type", "implementation"]
+}
