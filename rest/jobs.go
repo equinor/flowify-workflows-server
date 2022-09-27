@@ -14,7 +14,7 @@ import (
 	"github.com/argoproj/argo-workflows/v3/workflow/util"
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/storage"
-	"github.com/equinor/flowify-workflows-server/v2/transpiler"
+	"github.com/equinor/flowify-workflows-server/transpiler"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
