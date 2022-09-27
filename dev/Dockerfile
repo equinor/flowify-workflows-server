@@ -16,7 +16,7 @@ RUN apk add --no-cache \
     wget
 
 FROM base as buildbase
-WORKDiR /root
+WORKDIR /root
 # Install kubectl
 RUN curl -LO https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl && \
     chmod +x ./kubectl && \
@@ -46,7 +46,7 @@ COPY pkg ./pkg
 COPY v2 ./v2
 COPY main.go .
 COPY Makefile .
-RUN ["/bin/bash", "-c", "CGO_ENABLED=0 go build -v -o build/flowify-workflows-server"]
+RUN ["/bin/bash", "-c", "make server"]
 # EXPOSE 8842/tcp
 
 ENTRYPOINT ["/bin/bash", "cluster_runner.sh"]
