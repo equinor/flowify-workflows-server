@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/equinor/flowify-workflows-server/auth"
-	"github.com/equinor/flowify-workflows-server/v2/user"
+	"github.com/equinor/flowify-workflows-server/user"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"

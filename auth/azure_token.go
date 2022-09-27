@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/equinor/flowify-workflows-server/v2/user"
+	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 

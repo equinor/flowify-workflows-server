@@ -21,7 +21,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/apiserver"
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/storage"
-	"github.com/equinor/flowify-workflows-server/v2/user"
+	"github.com/equinor/flowify-workflows-server/user"
 )
 
 const (

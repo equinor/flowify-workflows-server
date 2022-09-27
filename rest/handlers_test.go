@@ -18,7 +18,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/storage"
-	"github.com/equinor/flowify-workflows-server/v2/user"
+	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	gmux "github.com/gorilla/mux"

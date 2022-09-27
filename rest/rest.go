@@ -12,7 +12,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/storage"
-	userpkg "github.com/equinor/flowify-workflows-server/v2/user"
+	userpkg "github.com/equinor/flowify-workflows-server/user"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"

@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
-	"github.com/equinor/flowify-workflows-server/v2/user"
+	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"

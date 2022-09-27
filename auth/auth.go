@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	"github.com/equinor/flowify-workflows-server/v2/user"
+	"github.com/equinor/flowify-workflows-server/user"
 )
 
 // an authclient either gives an error or an authenticated user
