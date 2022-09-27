@@ -27,7 +27,6 @@ init:
 	git config core.hooksPath .githooks
 
 clean:
-	@go mod vendor
 	@go clean
 	@rm -rf build
 	@rm -rf docs/*.json
