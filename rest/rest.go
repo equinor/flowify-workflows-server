@@ -119,7 +119,7 @@ func RegisterRoutes(r *mux.Route, componentClient storage.ComponentClient, volum
 func RegisterOpenApiRoutes(r *mux.Route) {
 	subrouter := r.Subrouter()
 	sf := http.FileServer(http.FS(models.StaticSpec))
-	subrouter.PathPrefix("/").Handler(http.StripPrefix("/api/v2/", sf))
+	subrouter.PathPrefix("/").Handler(http.StripPrefix("/api/v1/", sf))
 }
 
 func SetContentTypeMiddleware(mediatype string) func(http.Handler) http.Handler {

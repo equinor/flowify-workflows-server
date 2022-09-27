@@ -1,13 +1,13 @@
 {
   "openapi": "3.0.2",
   "info": {
-    "description": "This is the Flowify V2 Rest API",
+    "description": "This is the Flowify V1 Rest API",
     "version": "2",
-    "title": "Flowify V2 API"
+    "title": "Flowify V1 API"
   },
   "servers": [
     {
-      "url": "https://flowify.aurora.equinor.com/api/v2"
+      "url": "https://flowify.aurora.equinor.com/api/v1"
     }
   ],
   "tags": [

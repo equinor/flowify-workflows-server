@@ -53,7 +53,7 @@ func (c *volumeClient) DeleteVolume(ctx context.Context, id models.ComponentRefe
 func Test_ListVolumesHTTPHandler(t *testing.T) {
 	mux := gmux.NewRouter()
 	client := NewMockVolumeClient()
-	RegisterVolumeRoutes(mux.PathPrefix("/api/v2"), client)
+	RegisterVolumeRoutes(mux.PathPrefix("/api/v1"), client)
 
 	type testCase struct {
 		Name     string
@@ -92,7 +92,7 @@ func Test_ListVolumesHTTPHandler(t *testing.T) {
 			// un-set the temporary response on the mock-service
 			defer fake.Unset()
 
-			url := "/api/v2/volumes/" + test.Path
+			url := "/api/v1/volumes/" + test.Path
 			request := httptest.NewRequest(test.Verb, url, nil)
 
 			w := httptest.NewRecorder()
@@ -112,7 +112,7 @@ func Test_ListVolumesHTTPHandler(t *testing.T) {
 func Test_GetVolumeHTTPHandler(t *testing.T) {
 	mux := gmux.NewRouter()
 	client := NewMockVolumeClient()
-	RegisterVolumeRoutes(mux.PathPrefix("/api/v2"), client)
+	RegisterVolumeRoutes(mux.PathPrefix("/api/v1"), client)
 
 	type testCase struct {
 		Name         string
@@ -147,7 +147,7 @@ func Test_GetVolumeHTTPHandler(t *testing.T) {
 			// un-set the temporary response on the mock-service
 			defer fake.Unset()
 
-			url := "/api/v2/volumes/" + test.Path
+			url := "/api/v1/volumes/" + test.Path
 			request := httptest.NewRequest(http.MethodGet, url, nil)
 			w := httptest.NewRecorder()
 			mux.ServeHTTP(w, request)
@@ -169,7 +169,7 @@ func Test_GetVolumeHTTPHandler(t *testing.T) {
 func Test_PostVolumeHTTPHandler(t *testing.T) {
 	mux := gmux.NewRouter()
 	client := NewMockVolumeClient()
-	RegisterVolumeRoutes(mux.PathPrefix("/api/v2"), client)
+	RegisterVolumeRoutes(mux.PathPrefix("/api/v1"), client)
 
 	type testCase struct {
 		Name         string
@@ -238,7 +238,7 @@ func Test_PostVolumeHTTPHandler(t *testing.T) {
 			// un-set the temporary response on the mock-service at end of scope
 			defer fake.Unset()
 
-			url := "/api/v2/volumes/" + test.Path
+			url := "/api/v1/volumes/" + test.Path
 			request := httptest.NewRequest(test.Verb, url, bytes.NewReader(first(json.Marshal(test.InputVolume))))
 			request.Header.Add("Content-Type", "application/json")
 
@@ -258,7 +258,7 @@ func Test_PostVolumeHTTPHandler(t *testing.T) {
 func Test_DeleteVolumeHTTPHandler(t *testing.T) {
 	mux := gmux.NewRouter()
 	client := NewMockVolumeClient()
-	RegisterVolumeRoutes(mux.PathPrefix("/api/v2"), client)
+	RegisterVolumeRoutes(mux.PathPrefix("/api/v1"), client)
 
 	type testCase struct {
 		Name         string
@@ -290,7 +290,7 @@ func Test_DeleteVolumeHTTPHandler(t *testing.T) {
 			// un-set the temporary response on the mock-service
 			defer fake.Unset()
 
-			url := "/api/v2/volumes/" + test.Path
+			url := "/api/v1/volumes/" + test.Path
 			request := httptest.NewRequest(http.MethodDelete, url, nil)
 			w := httptest.NewRecorder()
 			mux.ServeHTTP(w, request)

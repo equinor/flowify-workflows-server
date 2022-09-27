@@ -243,25 +243,25 @@ func Test_ComponentHTTPHandler(t *testing.T) {
 	c2v2u1baduid.Uid = models.NewComponentReference()
 
 	mux := gmux.NewRouter()
-	RegisterComponentRoutes(mux.PathPrefix("/api/v2"), client)
-	RegisterWorkflowRoutes(mux.PathPrefix("/api/v2"), client)
+	RegisterComponentRoutes(mux.PathPrefix("/api/v1"), client)
+	RegisterWorkflowRoutes(mux.PathPrefix("/api/v1"), client)
 
 	testcases := []testCase{
-		{Name: "list components", Method: http.MethodGet, URL: "/api/v2/components/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
-		{Name: "post component", Method: http.MethodPost, URL: "/api/v2/components/", Body: cmpReq, ExpectedResponseStatusCode: http.StatusCreated, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v2/components/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
-		{Name: "get component", Method: http.MethodGet, URL: "/api/v2/components/" + c1.Uid.String(), Body: cmpReq, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}}, //"Location": "/api/v2/components/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
-		{Name: "put component", Method: http.MethodPut, URL: "/api/v2/components/" + compWithUid.Uid.String(), Body: []byte(fmt.Sprintf(`{ "component": %s , "options": {}}`, stringify(compWithUid))), ExpectedResponseStatusCode: http.StatusNoContent, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v2/components/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
-		{Name: "list component versions", Method: http.MethodGet, URL: "/api/v2/components/" + c2Uid.String() + "/versions/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
-		{Name: "list workflows", Method: http.MethodGet, URL: "/api/v2/workflows/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
-		{Name: "post workflow", Method: http.MethodPost, URL: "/api/v2/workflows/", Body: wfReq, ExpectedResponseStatusCode: http.StatusCreated, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v2/workflows/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
-		{Name: "get workflow", Method: http.MethodGet, URL: "/api/v2/workflows/" + wfWithUid.Uid.String(), Body: wfWithUidBytes, ExpectedResponseStatusCode: http.StatusOK, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{}},
-		{Name: "put workflow", Method: http.MethodPut, URL: "/api/v2/workflows/" + wfWithUid.Uid.String(), Body: stringify(models.WorkflowPostRequest{Workflow: wfWithUid}), ExpectedResponseStatusCode: http.StatusNoContent, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{}},
-		{Name: "list workflow versions", Method: http.MethodGet, URL: "/api/v2/workflows/" + c2Uid.String() + "/versions/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
-		{Name: "delete component", Method: http.MethodDelete, URL: "/api/v2/components/" + crefver.Uid.String() + "/" + crefver.Version.String(), Body: nil, ExpectedResponseStatusCode: http.StatusNoContent, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
-		{Name: "delete workflow", Method: http.MethodDelete, URL: "/api/v2/workflows/" + wrefver.Uid.String() + "/" + wrefver.Version.String(), Body: nil, ExpectedResponseStatusCode: http.StatusNoContent, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
-		{Name: "patch component", Method: http.MethodPatch, URL: "/api/v2/components/" + c2v2.Uid.String(), Body: []byte(fmt.Sprintf(`{ "component": %s , "options": {}}`, stringify(c2v2u1))), ExpectedResponseStatusCode: http.StatusOK, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v2/components/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
-		{Name: "patch component bad uid", Method: http.MethodPatch, URL: "/api/v2/components/" + c2v2.Uid.String(), Body: []byte(fmt.Sprintf(`{ "component": %s , "options": {}}`, stringify(c2v2u1baduid))), ExpectedResponseStatusCode: http.StatusBadRequest, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{}},
-		{Name: "patch workflow", Method: http.MethodPatch, URL: "/api/v2/workflows/" + w1v2u1.Uid.String(), Body: stringify(models.WorkflowPostRequest{Workflow: w1v2u1}), ExpectedResponseStatusCode: http.StatusOK, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v2/workflows/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
+		{Name: "list components", Method: http.MethodGet, URL: "/api/v1/components/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
+		{Name: "post component", Method: http.MethodPost, URL: "/api/v1/components/", Body: cmpReq, ExpectedResponseStatusCode: http.StatusCreated, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v1/components/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
+		{Name: "get component", Method: http.MethodGet, URL: "/api/v1/components/" + c1.Uid.String(), Body: cmpReq, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}}, //"Location": "/api/v1/components/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
+		{Name: "put component", Method: http.MethodPut, URL: "/api/v1/components/" + compWithUid.Uid.String(), Body: []byte(fmt.Sprintf(`{ "component": %s , "options": {}}`, stringify(compWithUid))), ExpectedResponseStatusCode: http.StatusNoContent, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v1/components/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
+		{Name: "list component versions", Method: http.MethodGet, URL: "/api/v1/components/" + c2Uid.String() + "/versions/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
+		{Name: "list workflows", Method: http.MethodGet, URL: "/api/v1/workflows/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
+		{Name: "post workflow", Method: http.MethodPost, URL: "/api/v1/workflows/", Body: wfReq, ExpectedResponseStatusCode: http.StatusCreated, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v1/workflows/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
+		{Name: "get workflow", Method: http.MethodGet, URL: "/api/v1/workflows/" + wfWithUid.Uid.String(), Body: wfWithUidBytes, ExpectedResponseStatusCode: http.StatusOK, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{}},
+		{Name: "put workflow", Method: http.MethodPut, URL: "/api/v1/workflows/" + wfWithUid.Uid.String(), Body: stringify(models.WorkflowPostRequest{Workflow: wfWithUid}), ExpectedResponseStatusCode: http.StatusNoContent, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{}},
+		{Name: "list workflow versions", Method: http.MethodGet, URL: "/api/v1/workflows/" + c2Uid.String() + "/versions/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
+		{Name: "delete component", Method: http.MethodDelete, URL: "/api/v1/components/" + crefver.Uid.String() + "/" + crefver.Version.String(), Body: nil, ExpectedResponseStatusCode: http.StatusNoContent, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
+		{Name: "delete workflow", Method: http.MethodDelete, URL: "/api/v1/workflows/" + wrefver.Uid.String() + "/" + wrefver.Version.String(), Body: nil, ExpectedResponseStatusCode: http.StatusNoContent, Headers: nil, ExpectedResponseHeaders: map[string]string{}},
+		{Name: "patch component", Method: http.MethodPatch, URL: "/api/v1/components/" + c2v2.Uid.String(), Body: []byte(fmt.Sprintf(`{ "component": %s , "options": {}}`, stringify(c2v2u1))), ExpectedResponseStatusCode: http.StatusOK, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v1/components/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
+		{Name: "patch component bad uid", Method: http.MethodPatch, URL: "/api/v1/components/" + c2v2.Uid.String(), Body: []byte(fmt.Sprintf(`{ "component": %s , "options": {}}`, stringify(c2v2u1baduid))), ExpectedResponseStatusCode: http.StatusBadRequest, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{}},
+		{Name: "patch workflow", Method: http.MethodPatch, URL: "/api/v1/workflows/" + w1v2u1.Uid.String(), Body: stringify(models.WorkflowPostRequest{Workflow: w1v2u1}), ExpectedResponseStatusCode: http.StatusOK, Headers: map[string]string{"Content-Type": "application/json"}, ExpectedResponseHeaders: map[string]string{"Location": "/api/v1/workflows/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
 	}
 
 	for _, test := range testcases {
@@ -301,7 +301,7 @@ func Test_ComponentHTTPHandler(t *testing.T) {
 				require.Regexp(t, regexp.MustCompile(v), res.Header[k][0])
 			}
 
-			if test.URL == "/api/v2/components/" && test.Method == http.MethodGet && w.Code == http.StatusOK {
+			if test.URL == "/api/v1/components/" && test.Method == http.MethodGet && w.Code == http.StatusOK {
 				roundtrip := models.MetadataList{}
 				require.NoError(t, json.Unmarshal(payload, &roundtrip))
 				require.Len(t, roundtrip.Items, 2)
@@ -378,10 +378,10 @@ func Test_JobSubmitHTTPHandler(t *testing.T) {
 	argoClientSet := fake.NewSimpleClientset()
 	argoClientSet.PrependReactor("create", "workflows", UIDReactor)
 	mux := gmux.NewRouter()
-	RegisterJobRoutes(mux.PathPrefix("/api/v2"), client, argoClientSet)
+	RegisterJobRoutes(mux.PathPrefix("/api/v1"), client, argoClientSet)
 
 	testcases := []testCase{
-		{Name: "submit jobs", Method: http.MethodPost, URL: "/api/v2/jobs/", Body: []byte(jobSubmitRequest), ExpectedResponseStatusCode: http.StatusCreated, Headers: nil, ExpectedResponseHeaders: map[string]string{"Location": "/api/v2/jobs/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
+		{Name: "submit jobs", Method: http.MethodPost, URL: "/api/v1/jobs/", Body: []byte(jobSubmitRequest), ExpectedResponseStatusCode: http.StatusCreated, Headers: nil, ExpectedResponseHeaders: map[string]string{"Location": "/api/v1/jobs/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},
 	}
 
 	for _, test := range testcases {
@@ -491,10 +491,10 @@ func Test_JobEventHTTPHandler(t *testing.T) {
 	}()
 
 	mux := gmux.NewRouter()
-	RegisterJobRoutes(mux.PathPrefix("/api/v2"), nil, argoClientSet)
+	RegisterJobRoutes(mux.PathPrefix("/api/v1"), nil, argoClientSet)
 
 	testcases := []testCase{
-		{Name: "listen for job events", Method: http.MethodGet, URL: "/api/v2/jobs/dummy/events/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: nil}}
+		{Name: "listen for job events", Method: http.MethodGet, URL: "/api/v1/jobs/dummy/events/", Body: nil, ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: nil}}
 
 	for _, test := range testcases {
 		t.Run(test.Name, func(t *testing.T) {
@@ -546,11 +546,11 @@ func Test_JobDeleteHandler(t *testing.T) {
 	argoClient.PrependReactor("get", "workflows", GetReactor)
 	argoClient.PrependReactor("delete", "workflows", DeleteReactor)
 	mux := gmux.NewRouter()
-	RegisterJobRoutes(mux.PathPrefix("/api/v2"), client, argoClient)
+	RegisterJobRoutes(mux.PathPrefix("/api/v1"), client, argoClient)
 
 	testcases := []testCase{
-		{Name: "terminate job", Method: http.MethodDelete, URL: fmt.Sprintf("/api/v2/jobs/%s", cRefVer.Uid.String()), Body: []byte(cRefVer.Uid.String()), ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: nil},
-		{Name: "terminate job, no access", Method: http.MethodDelete, URL: fmt.Sprintf("/api/v2/jobs/%s", cRefVerNoAccess.Uid.String()), Body: nil, ExpectedResponseStatusCode: http.StatusInternalServerError, Headers: nil, ExpectedResponseHeaders: nil},
+		{Name: "terminate job", Method: http.MethodDelete, URL: fmt.Sprintf("/api/v1/jobs/%s", cRefVer.Uid.String()), Body: []byte(cRefVer.Uid.String()), ExpectedResponseStatusCode: http.StatusOK, Headers: nil, ExpectedResponseHeaders: nil},
+		{Name: "terminate job, no access", Method: http.MethodDelete, URL: fmt.Sprintf("/api/v1/jobs/%s", cRefVerNoAccess.Uid.String()), Body: nil, ExpectedResponseStatusCode: http.StatusInternalServerError, Headers: nil, ExpectedResponseHeaders: nil},
 	}
 	for _, test := range testcases {
 		t.Run(test.Name, func(t *testing.T) {
@@ -589,7 +589,7 @@ func Test_JobDeleteHandler(t *testing.T) {
 // Workspace client can be mocked using context injection
 func Test_WorkspacesHTTPHandler(t *testing.T) {
 	mux := gmux.NewRouter()
-	RegisterWorkspaceRoutes(mux.PathPrefix("/api/v2"))
+	RegisterWorkspaceRoutes(mux.PathPrefix("/api/v1"))
 
 	type testCase struct {
 		Name        string
@@ -615,7 +615,7 @@ func Test_WorkspacesHTTPHandler(t *testing.T) {
 				}
 			}()
 
-			request := httptest.NewRequest(http.MethodGet, "/api/v2/workspaces/", nil)
+			request := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/", nil)
 			// inject test context here
 			ctx := request.Context()
 			ctx = context.WithValue(ctx, workspace.WorkspaceKey, test.GivenAccess)

@@ -165,7 +165,7 @@ func JobsSubmitHandler(componentClient storage.ComponentClient, argoclient argoc
 			return
 		}
 
-		locHeader := map[string]string{"Location": path.Join("/api/v2/jobs/", job.Metadata.Uid.String())}
+		locHeader := map[string]string{"Location": path.Join("/api/v1/jobs/", job.Metadata.Uid.String())}
 		//WriteResponseAndHeaders(w, http.StatusCreated, locHeader, []byte(`{}`))
 		WriteResponse(w, http.StatusCreated, locHeader, nil, "submitJob")
 	})
