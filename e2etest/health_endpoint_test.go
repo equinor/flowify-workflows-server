@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/equinor/flowify-workflows-server/apiserver"
-	"github.com/equinor/flowify-workflows-server/v2/auth"
+	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/v2/storage"
 )
 

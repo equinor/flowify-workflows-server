@@ -14,8 +14,8 @@ import (
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned/fake"
+	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
-	"github.com/equinor/flowify-workflows-server/v2/auth"
 	"github.com/equinor/flowify-workflows-server/v2/models"
 	"github.com/equinor/flowify-workflows-server/v2/storage"
 	"github.com/equinor/flowify-workflows-server/v2/user"

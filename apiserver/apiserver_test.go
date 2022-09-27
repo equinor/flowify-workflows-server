@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/equinor/flowify-workflows-server/v2/auth"
+	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
