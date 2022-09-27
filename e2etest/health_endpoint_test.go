@@ -5,11 +5,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
-	"time"
 
 	v1alpha "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned/fake"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/util/wait"
+	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/equinor/flowify-workflows-server/apiserver"
@@ -45,25 +44,18 @@ func TestLiveEndpoint(t *testing.T) {
 		authc,
 	)
 
-	go server.Run(ctx)
+	readyNotifier := make(chan bool, 1)
 
-	// Exponential backoff needs a largish initial value to allow for server startup
-	// 1s works in local dev, may need to adjust for hosted testing
-	err := wait.ExponentialBackoff(wait.Backoff{Duration: time.Second, Steps: 10}, func() (bool, error) { return checkLiveEndpoint(t) })
-	assert.NoError(t, err)
-}
+	go server.Run(ctx, &readyNotifier)
 
-func checkLiveEndpoint(t *testing.T) (bool, error) {
-	// TODO: Check the string value (alive)
+	assert.True(t, <-readyNotifier, "wait for server start before testing")
+
 	resp, err := http.Get("http://localhost:8842/livez")
-	if resp == nil {
-		// server has not yet started, signal retry
-		return false, nil
-	}
+	require.NoError(t, err)
+	require.NotNil(t, resp)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	payload, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, "alive", string(payload))
-	return true, err
 }
