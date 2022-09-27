@@ -2,7 +2,12 @@ name: Build public docker images to ghcr
  
 on: 
   workflow_dispatch:
-
+  push:
+    paths-ignore:
+      - ".github/**"
+    tags: '*'
+    branches:
+      - main
 permissions:
       id-token: write
       contents: read
