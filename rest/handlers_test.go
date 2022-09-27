@@ -37,14 +37,14 @@ func init() {
 }
 
 var (
-	cmp1, _ = ioutil.ReadFile("../../models/examples/minimal-any-component.json")
+	cmp1, _ = ioutil.ReadFile("../models/examples/minimal-any-component.json")
 	cmpReq  = []byte(fmt.Sprintf(`
 	{
 		"options": {},
 		"component": %s
 	}`, cmp1))
 
-	wf1, _ = ioutil.ReadFile("../../models/examples/minimal-any-workflow.json")
+	wf1, _ = ioutil.ReadFile("../models/examples/minimal-any-workflow.json")
 	wfReq  = []byte(fmt.Sprintf(`
 {
 	"options": {},

@@ -16,7 +16,7 @@ import (
 
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
-	"github.com/equinor/flowify-workflows-server/v2/rest"
+	"github.com/equinor/flowify-workflows-server/rest"
 	"github.com/equinor/flowify-workflows-server/v2/storage"
 	log "github.com/sirupsen/logrus"
 
