@@ -1,5 +1,7 @@
 FROM golang:1.18-alpine as base
 LABEL description="Flowify build test environment"
+LABEL org.opencontainers.image.source = "https://github.com/equinor/flowify-workflows-server"
+
 RUN apk add git make binutils gcc musl-dev
 
 FROM base as builder
