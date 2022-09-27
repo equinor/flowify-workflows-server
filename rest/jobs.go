@@ -13,7 +13,7 @@ import (
 	argoclient "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	"github.com/argoproj/argo-workflows/v3/workflow/util"
 	"github.com/equinor/flowify-workflows-server/models"
-	"github.com/equinor/flowify-workflows-server/v2/storage"
+	"github.com/equinor/flowify-workflows-server/storage"
 	"github.com/equinor/flowify-workflows-server/v2/transpiler"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"

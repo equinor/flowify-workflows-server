@@ -12,7 +12,7 @@ import (
 	"strconv"
 
 	"github.com/equinor/flowify-workflows-server/models"
-	"github.com/equinor/flowify-workflows-server/v2/storage"
+	"github.com/equinor/flowify-workflows-server/storage"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )

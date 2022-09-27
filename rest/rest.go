@@ -11,7 +11,7 @@ import (
 	argoclient "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/models"
-	"github.com/equinor/flowify-workflows-server/v2/storage"
+	"github.com/equinor/flowify-workflows-server/storage"
 	userpkg "github.com/equinor/flowify-workflows-server/v2/user"
 
 	"github.com/gorilla/mux"

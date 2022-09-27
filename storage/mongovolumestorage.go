@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// Implements v2/storage.VolumeClient
+// Implements storage.VolumeClient
 type MongoVolumeClientImpl struct {
 	client  *mongo.Client
 	db_name string

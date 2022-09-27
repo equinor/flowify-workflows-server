@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/equinor/flowify-workflows-server/models"
-	"github.com/equinor/flowify-workflows-server/v2/storage"
+	"github.com/equinor/flowify-workflows-server/storage"
 	"github.com/equinor/flowify-workflows-server/v2/user"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
