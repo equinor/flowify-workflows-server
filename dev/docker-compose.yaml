@@ -33,6 +33,9 @@ services:
       - FLOWIFY_MONGO_ADDRESS=mongo_server
       - FLOWIFY_MONGO_PORT=27017
       - FLOWIFY_K8S_NAMESPACE=argo
+      - TENANT_ID=sandbox
+      - CLIENT_ID=flowify
+      - JWKS_URI=DISABLE_JWT_SIGNATURE_VERIFICATION
 
 networks:
   default:

@@ -25,15 +25,18 @@ RUN curl -LO https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl && \
 RUN curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.15.0/kind-linux-amd64 && \
     chmod +x ./kind && \
     mv ./kind /usr/local/bin/kind
-RUN mkdir -p $GOPATH/src/github.com/equinor/
 # Install argo
 RUN curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.0/argo-linux-amd64.gz && \
     gunzip argo-linux-amd64.gz && \
     chmod +x argo-linux-amd64 && \
     mv ./argo-linux-amd64 /usr/local/bin/argo
+RUN mkdir -p $GOPATH/src/github.com/equinor/
 WORKDIR $GOPATH/src/github.com/equinor/flowify-workflows-server
+# COPY dev/quick-start-argo.yml .
 COPY dev/cluster_runner.sh .
 COPY dev/dev-config.yaml .
+COPY dev/kind.yaml .
+COPY dev/argo-cluster-install/ ./argo-cluster-install
 RUN chmod +x ./cluster_runner.sh
 COPY go.mod .
 COPY go.sum .
