@@ -16,7 +16,7 @@ import (
 
 	wf "github.com/argoproj/argo-workflows/v3/pkg/apiclient/workflow"
 	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
-	fuser "github.com/equinor/flowify-workflows-server/v2/user"
+	fuser "github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"

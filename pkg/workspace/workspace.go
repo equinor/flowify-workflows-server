@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	userpkg "github.com/equinor/flowify-workflows-server/v2/user"
+	userpkg "github.com/equinor/flowify-workflows-server/user"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"

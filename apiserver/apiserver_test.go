@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/equinor/flowify-workflows-server/v2/auth"
+	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -27,8 +27,8 @@ func Test_Routes(t *testing.T) {
 	fs, err := NewFlowifyServer(
 		fake.NewSimpleClientset(),
 		nil, /* wfclient cs_workflow.Interface */
-		nil, /* v2.storage  */
-		nil, /* v2.volumeStorage  */
+		nil, /* storage  */
+		nil, /* volumeStorage  */
 		1234,
 		auth.AzureTokenAuthenticator{},
 	)
@@ -41,7 +41,7 @@ func Test_Routes(t *testing.T) {
 	fs.registerApplicationRoutes(mux)
 
 	testcases := []testCase{
-		{Name: "api/v2", URL: "/api/v2/components/"},
+		{Name: "api/v1", URL: "/api/v1/components/"},
 		{Name: "z-page/live", URL: "/livez"},
 		{Name: "z-page/ready", URL: "/readyz"},
 		{Name: "z-page/version", URL: "/versionz"},

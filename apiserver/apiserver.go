@@ -14,10 +14,10 @@ import (
 	gmux "github.com/gorilla/mux"
 	"github.com/pkg/errors"
 
+	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
-	"github.com/equinor/flowify-workflows-server/v2/auth"
-	"github.com/equinor/flowify-workflows-server/v2/rest"
-	"github.com/equinor/flowify-workflows-server/v2/storage"
+	"github.com/equinor/flowify-workflows-server/rest"
+	"github.com/equinor/flowify-workflows-server/storage"
 	log "github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -160,7 +160,7 @@ func SetCustomHeaders(next http.Handler) http.Handler {
 
 func (fs *flowifyServer) registerApplicationRoutes(router *gmux.Router) {
 	// send a pathprefix that catches all and handle in a subrouter to avoid interference
-	rest.RegisterRoutes(router.PathPrefix("/api/v2"), fs.nodeStorage, fs.volumeStorage, fs.wfClient, fs.k8Client, fs.auth)
+	rest.RegisterRoutes(router.PathPrefix("/api/v1"), fs.nodeStorage, fs.volumeStorage, fs.wfClient, fs.k8Client, fs.auth)
 
 	router.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "alive") }).Methods(http.MethodGet)
 	router.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "ready") }).Methods(http.MethodGet)
