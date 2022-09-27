@@ -1,0 +1,149 @@
+# Flowify needs a namespace to store config maps.
+# No other data will be stored in the config ns
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/part-of: "flowify"
+  name: "argo"
+
+
+# Each workspace consists of a namespace 
+# and a config map (stored in the config namespace)
+
+---
+# Namespace 'sandbox-project-a'
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/part-of: "flowify"
+  name: "sandbox-project-a"
+
+---
+# Developer workspace environment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    labels:
+        app.kubernetes.io/component: "workspace-config"
+        app.kubernetes.io/part-of: "flowify"
+    name: "sandbox-project-a"
+    # config lookup via FLOWIFY_K8S_NAMESPACE env, default to test 
+    namespace: "argo"
+data:
+    roles: "[[\"sandbox-developer\"]]"
+
+
+
+---
+# Namespace 'sandbox-project-b'
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/part-of: "flowify"
+  name: "sandbox-project-b"
+
+---
+# Workdspce/project
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    labels:
+        app.kubernetes.io/component: "workspace-config"
+        app.kubernetes.io/part-of: "flowify"
+    name: "sandbox-project-b"
+    # config lookup via FLOWIFY_K8S_NAMESPACE env, default to test 
+    namespace: "argo"
+data:
+    roles: "[\"sandbox-admin\"]"
+
+---
+# Role for sandbox-project-a
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workflow-role
+  namespace: sandbox-project-a
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - watch
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflows
+  verbs:
+  - create
+  - get
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflowtasksets
+  - workflowtasksets/finalizers
+  verbs:
+  - list
+  - watch
+  - get
+  - update
+  - patch
+
+
+---
+# Role binding for sandbox-project-a
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-project-a-binding
+  namespace: sandbox-project-a
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workflow-role
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: sandbox-project-a
+
+---
+# Role descriptions
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    labels:
+        app.kubernetes.io/part-of: "flowify"
+    name: "role-descriptions"
+    namespace: "argo"
+data:
+    "sandbox-developer": "Need to play in the sandbox"
+    "sandbox-admin": "Required for God-mode"
