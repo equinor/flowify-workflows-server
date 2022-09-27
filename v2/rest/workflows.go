@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/equinor/flowify-workflows-server/v2/models"
+	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/v2/storage"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"

@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	// wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
+	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/secret"
-	"github.com/equinor/flowify-workflows-server/v2/models"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 )
@@ -250,7 +250,7 @@ func Test_RemoveDuplicatedTemplates(t *testing.T) {
 }
 
 func Test_GetArgoWorkflow(t *testing.T) {
-	raw, err := ioutil.ReadFile("../models/examples/job-example.json")
+	raw, err := ioutil.ReadFile("../../models/examples/job-example.json")
 	assert.Nil(t, err)
 	var job models.Job
 	err = json.Unmarshal(raw, &job)
@@ -444,7 +444,7 @@ func Test_TranspileVolume(t *testing.T) {
 
 func Test_TranspileGraphVolume(t *testing.T) {
 
-	raw, err := ioutil.ReadFile("../models/examples/graph-input-volumes.json")
+	raw, err := ioutil.ReadFile("../../models/examples/graph-input-volumes.json")
 	assert.Nil(t, err)
 	var job models.Job
 	err = json.Unmarshal(raw, &job)
@@ -465,7 +465,7 @@ func Test_TranspileGraphVolume(t *testing.T) {
 
 func Test_TranspileGraphThroughputVolume(t *testing.T) {
 
-	raw, err := ioutil.ReadFile("../models/examples/graph-throughput-volumes.json")
+	raw, err := ioutil.ReadFile("../../models/examples/graph-throughput-volumes.json")
 	assert.Nil(t, err)
 	var job models.Job
 	err = json.Unmarshal(raw, &job)
@@ -490,7 +490,7 @@ func first[T1 any, T2 any](arg1 T1, arg2 T2) T1 { return arg1 }
 
 func Test_TranspileIfStatement(t *testing.T) {
 
-	raw, err := ioutil.ReadFile("../models/examples/if-statement.json")
+	raw, err := ioutil.ReadFile("../../models/examples/if-statement.json")
 	assert.Nil(t, err)
 	var job models.Job
 	err = json.Unmarshal(raw, &job)
@@ -510,7 +510,7 @@ func Test_TranspileIfStatement(t *testing.T) {
 
 func Test_TranspileIfElseStatement(t *testing.T) {
 
-	raw, err := ioutil.ReadFile("../models/examples/if-else-statement.json")
+	raw, err := ioutil.ReadFile("../../models/examples/if-else-statement.json")
 	assert.Nil(t, err)
 	var job models.Job
 	err = json.Unmarshal(raw, &job)

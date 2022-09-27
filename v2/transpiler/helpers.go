@@ -6,7 +6,7 @@ import (
 	"path"
 	"reflect"
 
-	"github.com/equinor/flowify-workflows-server/v2/models"
+	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"

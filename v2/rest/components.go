@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/equinor/flowify-workflows-server/v2/models"
+	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/v2/storage"
 	"github.com/equinor/flowify-workflows-server/v2/user"
 	"github.com/google/uuid"

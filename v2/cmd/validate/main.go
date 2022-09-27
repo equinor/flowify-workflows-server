@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/equinor/flowify-workflows-server/v2/models"
+	"github.com/equinor/flowify-workflows-server/models"
 	log "github.com/sirupsen/logrus"
 )
 

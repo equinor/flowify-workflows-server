@@ -15,8 +15,8 @@ import (
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned/fake"
 	"github.com/equinor/flowify-workflows-server/auth"
+	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
-	"github.com/equinor/flowify-workflows-server/v2/models"
 	"github.com/equinor/flowify-workflows-server/v2/storage"
 	"github.com/equinor/flowify-workflows-server/v2/user"
 	"github.com/golang-jwt/jwt/v4"
@@ -37,14 +37,14 @@ func init() {
 }
 
 var (
-	cmp1, _ = ioutil.ReadFile("../models/examples/minimal-any-component.json")
+	cmp1, _ = ioutil.ReadFile("../../models/examples/minimal-any-component.json")
 	cmpReq  = []byte(fmt.Sprintf(`
 	{
 		"options": {},
 		"component": %s
 	}`, cmp1))
 
-	wf1, _ = ioutil.ReadFile("../models/examples/minimal-any-workflow.json")
+	wf1, _ = ioutil.ReadFile("../../models/examples/minimal-any-workflow.json")
 	wfReq  = []byte(fmt.Sprintf(`
 {
 	"options": {},

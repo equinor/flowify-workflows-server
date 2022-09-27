@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/equinor/flowify-workflows-server/v2/models"
+	"github.com/equinor/flowify-workflows-server/models"
 )
 
 type Pagination struct {

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
-	"github.com/equinor/flowify-workflows-server/v2/models"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
