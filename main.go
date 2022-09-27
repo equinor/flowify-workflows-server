@@ -166,7 +166,7 @@ func main() {
 		panic("Cannot create a Flowify server object")
 	}
 
-	server.Run(ctx)
+	server.Run(ctx, nil)
 
 	// Create a deadline to wait for.
 	ctx, cancel = context.WithTimeout(context.Background(), maxWait)

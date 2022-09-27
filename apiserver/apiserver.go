@@ -87,7 +87,7 @@ func NewFlowifyServer(k8Client kubernetes.Interface,
 	}, nil
 }
 
-func (fs *flowifyServer) Run(ctx context.Context) {
+func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
 	fs.HttpServer = fs.newHTTPServer(ctx, fs.portnumber)
 
 	// Start listener
@@ -108,14 +108,26 @@ func (fs *flowifyServer) Run(ctx context.Context) {
 	defer conn.Close()
 
 	if err != nil {
-		log.Fatal(errors.Wrapf(err, "cannot create listener on socket %s", address))
+		log.Error(errors.Wrapf(err, "cannot create listener on socket %s", address))
+		if readyNotifier != nil {
+			// signal unsuccessful startup
+			*readyNotifier <- false
+		}
 		panic("") // no return
 	}
 
 	go func() { fs.HttpServer.Serve(conn) }()
-
 	log.WithFields(log.Fields{"version": CommitSHA, "port": address}).Info("✨ Flowify server started successfully ✨")
 
+	if readyNotifier != nil {
+		// signal successful startup
+		*readyNotifier <- true
+
+		// no more data will be sent here
+		close(*readyNotifier)
+	}
+
+	// Handle graceful shutdown by relaying signals
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGTERM)
 
