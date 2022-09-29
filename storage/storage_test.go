@@ -20,10 +20,12 @@ import (
 const (
 	test_host              = "localhost"
 	test_port              = 27017
-	ext_mongo_hostname_env = "FLOWIFY_MONGO_ADDRESS"
-	ext_mongo_port_env     = "FLOWIFY_MONGO_PORT"
+	ext_mongo_hostname_env = "FLOWIFY_DB_CONFIG_ADDRESS"
+	ext_mongo_port_env     = "FLOWIFY_DB_CONFIG_PORT"
 	test_db_name           = "flowify-test"
 )
+
+var cfg DbConfig
 
 func init() {
 	if _, exists := os.LookupEnv(ext_mongo_hostname_env); !exists {
@@ -34,7 +36,15 @@ func init() {
 		os.Setenv(ext_mongo_port_env, strconv.Itoa(test_port))
 	}
 
-	m := NewMongoClient()
+	cfg = DbConfig{
+		DbName: test_db_name,
+		Select: "mongo",
+		Config: map[string]interface{}{
+			"Address": os.Getenv(ext_mongo_hostname_env),
+			"Port":    first(strconv.Atoi(os.Getenv(ext_mongo_port_env)))},
+	}
+
+	m := NewMongoClient(cfg)
 
 	log.SetOutput(ioutil.Discard)
 	log.Infof("Dropping db %s to make sure we're clean", test_db_name)
@@ -102,14 +112,14 @@ func makeJob(meta *models.Metadata, workspace string) models.Job {
 
 func TestCreateComponent(t *testing.T) {
 
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 
 	err := cstorage.CreateComponent(context.TODO(), makeComponent(nil))
 	assert.Nil(t, err)
 }
 
 func TestGetComponent(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 	cmpv1 := makeComponent(nil)
 	cmpv2 := cmpv1
 	cmpv2.Description = "Second version of document"
@@ -146,8 +156,8 @@ func TestGetComponent(t *testing.T) {
 }
 
 func TestDeleteDocument(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
-	NewMongoClient().Database(test_db_name).Drop(context.TODO())
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
 	ws_test := "ws-test"
 	authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: ws_test, HasAccess: true}})
 	cmp := makeComponent(nil)
@@ -298,7 +308,7 @@ func TestDeleteDocument(t *testing.T) {
 }
 
 func TestDeleteComponentVersions(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 	cmp := makeComponent(nil)
 	{
 		// first add component to get
@@ -335,12 +345,12 @@ func TestDeleteComponentVersions(t *testing.T) {
 }
 
 func TestListComponents(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 	Day := time.Duration(time.Hour * 24)
 	Days := func(i int) time.Duration { return time.Duration(i) * Day }
 	{
 		// drop db to make sure that at the end DB will contain one components
-		NewMongoClient().Database(test_db_name).Drop(context.TODO())
+		NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
 		// first add components to list
 		for i := 0; i < 5; i++ {
 			err := cstorage.CreateComponent(context.TODO(),
@@ -418,8 +428,8 @@ func TestListComponents(t *testing.T) {
 }
 
 func TestPatchComponent(t *testing.T) {
-	NewMongoClient().Database(test_db_name).Drop(context.TODO())
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 	cmpV1 := makeComponent(
 		&models.Metadata{
 			Name:       "test-component",
@@ -525,7 +535,7 @@ func TestCreateWorkflow(t *testing.T) {
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 	}
 
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
@@ -540,7 +550,7 @@ func TestCreateWorkflow(t *testing.T) {
 }
 
 func TestGetWorkflow(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 
 	wf := models.Workflow{
 		Metadata:  models.Metadata{Name: "test-wf", Uid: models.NewComponentReference(), Version: models.Version{Current: models.VersionInit, Tags: []string{"latest"}}},
@@ -589,7 +599,7 @@ func TestGetWorkflow(t *testing.T) {
 }
 
 func TestPutWorkflow(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 
 	wf := models.Workflow{Metadata: models.Metadata{Name: "test-wf", Uid: models.NewComponentReference()}, Component: makeComponent(nil), Workspace: "test"}
 
@@ -655,13 +665,13 @@ func TestPutWorkflow(t *testing.T) {
 }
 
 func TestListWorkflows(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 
 	Day := time.Duration(time.Hour * 24)
 	Days := func(i int) time.Duration { return time.Duration(i) * Day }
 	{
 		// drop db to make sure that at the end DB will contain one components
-		NewMongoClient().Database(test_db_name).Drop(context.TODO())
+		NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
 
 		// first add components to list
 		for i := 0; i < 5; i++ {
@@ -814,7 +824,7 @@ func TestCreateJob(t *testing.T) {
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 	}
 
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
@@ -829,7 +839,7 @@ func TestCreateJob(t *testing.T) {
 }
 
 func TestGetJob(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 
 	id := models.NewComponentReference()
 	name := "test-job-" + id.String()[:4]
@@ -877,12 +887,12 @@ func TestGetJob(t *testing.T) {
 }
 
 func TestListJobs(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
 	Day := time.Duration(time.Hour * 24)
 	Days := func(i int) time.Duration { return time.Duration(i) * Day }
 	{
 		// drop db to make sure that at the end DB will contain one components
-		NewMongoClient().Database(test_db_name).Drop(context.TODO())
+		NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
 
 		// first add components to list
 		for i := 0; i < 5; i++ {

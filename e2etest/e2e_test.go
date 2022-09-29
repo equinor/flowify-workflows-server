@@ -39,10 +39,6 @@ var (
 	url         = "localhost:27017"
 )
 
-func init() {
-	os.Setenv("FLOWIFY_K8S_NAMESPACE", "test")
-}
-
 func TestE2ETestSuite(t *testing.T) {
 	suite.Run(t, &e2eTestSuite{})
 }

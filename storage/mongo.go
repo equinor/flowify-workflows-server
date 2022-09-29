@@ -5,17 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
+	"github.com/mitchellh/mapstructure"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,29 +22,83 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
-func NewMongoClient() *mongo.Client {
+type MongoConfig struct {
+	Address string
+	Port    int
+}
+
+type CosmosConfig struct {
+	/*
+		Credentials from azure layout:
+		   {
+		     "PrimaryMongoDBConnectionString": "...=",
+		     "PrimaryReadOnlyMongoDBConnectionString": "...=",
+		     "SecondaryMongoDBConnectionString": "...=",
+		     "SecondaryReadOnlyMongoDBConnectionString": "...=",
+		     "northeuropeEndpoint": "...",
+		     "primaryEndpoint": "...",
+		     "primaryMasterKey": "...==",
+		     "primaryReadonlyMasterKey": "...==",
+		     "secondaryMasterKey": "...==",
+		     "secondaryReadonlyMasterKey": "...=="
+		   }
+
+	*/
+	Credentials string `mapstructure:"credentials"`
+}
+
+type DbConfig struct {
+	Select string
+	DbName string
+	Config map[string]interface{}
+}
+
+func (c MongoConfig) ConnectionString() (string, error) {
+	return fmt.Sprintf("mongodb://%s:%d", c.Address, c.Port), nil
+}
+
+func (c CosmosConfig) ConnectionString() (string, error) {
+	var creds struct {
+		PrimaryMongoDBConnectionString string
+	}
+	err := json.Unmarshal([]byte(c.Credentials), &creds)
+	if err != nil {
+		return "", errors.Wrapf(err, "could not unmarshal CosmosConfig: '%v'", c.Credentials)
+	}
+
+	uri, err := base64.StdEncoding.DecodeString(creds.PrimaryMongoDBConnectionString)
+	if err != nil {
+		return "", err
+	}
+
+	return string(uri), nil
+}
+
+func NewMongoClient(config DbConfig) *mongo.Client {
 	ctx := context.TODO()
 
 	var uri string
-
-	// This isn't very nice but we do this to figure out if we're in aurora given the
-	// deployment has the env var COSMOSDB_CREDS
-	// Also the env var is a dictionary and base64 encoded.
-	creds_string := os.Getenv("COSMOSDB_CREDS")
-	if creds_string != "" {
-		var creds map[string]interface{}
-		err := json.Unmarshal([]byte(creds_string), &creds)
+	switch config.Select {
+	case "mongo":
+		var cfg MongoConfig
+		err := mapstructure.Decode(config.Config, &cfg)
 		if err != nil {
-			logrus.Fatal(err)
-			panic("COSMOSDB_CREDS json error")
+			return nil
 		}
-		base64_uri := creds["PrimaryMongoDBConnectionString"].(string)
-		bytes_uri, _ := base64.StdEncoding.DecodeString(base64_uri)
-		uri = string(bytes_uri)
-	} else {
-		address := os.Getenv("FLOWIFY_MONGO_ADDRESS")
-		port, _ := strconv.Atoi(os.Getenv("FLOWIFY_MONGO_PORT"))
-		uri = fmt.Sprintf("mongodb://%s:%d", address, port)
+		uri, err = cfg.ConnectionString()
+		if err != nil {
+			return nil
+		}
+	case "cosmos":
+		var cfg CosmosConfig
+		err := mapstructure.Decode(config.Config, &cfg)
+		if err != nil {
+			return nil
+		}
+		uri, err = cfg.ConnectionString()
+		if err != nil {
+			return nil
+		}
 	}
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetDirect(true))

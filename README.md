@@ -121,6 +121,6 @@ To define a workspace for the Flowify application, we need two Kubernetes compon
 
 All `core.v1.Configmap` objects that hold the configuration for a workspace need
 to reside in the **same** namespace. The name of this namespace is set by the
-`FLOWIFY_K8S_NAMESPACE` environment variable. The Flowify server application
+`namespace` command-line flag. The Flowify server application
 needs to have permissions to read ConfigMaps from this namespace. The current
 available workspaces in the deployed application can be found [here](https://github.com/equinor/flowify-infrastructure/blob/main/kube/server/values.yaml).

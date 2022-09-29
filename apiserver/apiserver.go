@@ -24,27 +24,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const (
-	// MaxGRPCMessageSize contains max grpc message size
-	namespace       = "kubeflow"
-	configmapName   = "workflow-controller-configmap"
-	namespaceEnvVar = "FLOWIFY_K8S_NAMESPACE"
-)
-
-var user_namespace string
-
-func init() {
-	val, exists := os.LookupEnv(namespaceEnvVar)
-
-	if !exists {
-		log.Warning("Environment variable '" + namespaceEnvVar + "' is not set. Defaulting to 'test'")
-		val = "test"
-	}
-
-	user_namespace = val
-	log.WithFields(log.Fields{"namespace": user_namespace}).Debug("Setting flowify namespace")
-}
-
 var backoff = wait.Backoff{
 	Steps:    5,
 	Duration: 500 * time.Millisecond,
@@ -57,6 +36,7 @@ var BuildTime = "unknown"
 
 type flowifyServer struct {
 	k8Client      kubernetes.Interface
+	namespace     string
 	wfClient      argo_workflow.Interface
 	nodeStorage   storage.ComponentClient
 	volumeStorage storage.VolumeClient
@@ -67,17 +47,17 @@ type flowifyServer struct {
 }
 
 func NewFlowifyServer(k8Client kubernetes.Interface,
+	namespace string,
 	wfclient argo_workflow.Interface,
 	nodeStorage storage.ComponentClient,
 	volumeStorage storage.VolumeClient,
 	portnumber int,
 	sec auth.AuthClient) (flowifyServer, error) {
-	workspace := workspace.NewWorkspaceClient(k8Client, user_namespace)
-
-	//	Formatter: new(log.TextFormatter),
+	workspace := workspace.NewWorkspaceClient(k8Client, namespace)
 
 	return flowifyServer{
 		k8Client:      k8Client,
+		namespace:     namespace,
 		wfClient:      wfclient,
 		nodeStorage:   nodeStorage,
 		volumeStorage: volumeStorage,
@@ -172,7 +152,7 @@ func SetCustomHeaders(next http.Handler) http.Handler {
 
 func (fs *flowifyServer) registerApplicationRoutes(router *gmux.Router) {
 	// send a pathprefix that catches all and handle in a subrouter to avoid interference
-	rest.RegisterRoutes(router.PathPrefix("/api/v1"), fs.nodeStorage, fs.volumeStorage, fs.wfClient, fs.k8Client, fs.auth)
+	rest.RegisterRoutes(router.PathPrefix("/api/v1"), fs.nodeStorage, fs.volumeStorage, fs.wfClient, fs.k8Client, fs.auth, fs.workspace)
 
 	router.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "alive") }).Methods(http.MethodGet)
 	router.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "ready") }).Methods(http.MethodGet)

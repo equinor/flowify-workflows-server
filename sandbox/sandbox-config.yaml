@@ -32,7 +32,7 @@ metadata:
         app.kubernetes.io/component: "workspace-config"
         app.kubernetes.io/part-of: "flowify"
     name: "sandbox-project-a"
-    # config lookup via FLOWIFY_K8S_NAMESPACE env, default to test 
+    # config lookup via command-line flag `namespace`, default to test 
     namespace: "sandbox-config"
 data:
     roles: "[[\"sandbox-developer\"]]"
@@ -57,7 +57,7 @@ metadata:
         app.kubernetes.io/component: "workspace-config"
         app.kubernetes.io/part-of: "flowify"
     name: "sandbox-project-b"
-    # config lookup via FLOWIFY_K8S_NAMESPACE env, default to test 
+    # config lookup via command-line flag `namespace`, default to test 
     namespace: "sandbox-config"
 data:
     roles: "[\"sandbox-admin\"]"

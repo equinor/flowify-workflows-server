@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/equinor/flowify-workflows-server/models"
@@ -334,8 +336,18 @@ func init() {
 	}
 }
 
+func first(i int, e error) int { return i }
+
 func TestDereferenceComponent(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(), test_db_name)
+	cfg := DbConfig{
+		DbName: test_db_name,
+		Select: "mongo",
+		Config: map[string]interface{}{
+			"Address": os.Getenv("FLOWIFY_DB_CONFIG_ADDRESS"),
+			"Port":    first(strconv.Atoi(os.Getenv("FLOWIFY_DB_CONFIG_PORT")))},
+	}
+
+	cstorage := NewMongoStorageClient(NewMongoClient(cfg), cfg.DbName)
 	err := cstorage.CreateComponent(context.TODO(), brickCmp)
 	assert.Nil(t, err)
 	err = cstorage.CreateComponent(context.TODO(), graphCmp)
