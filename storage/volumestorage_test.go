@@ -23,9 +23,15 @@ func init() {
 	if _, exists := os.LookupEnv(ext_mongo_port_env); !exists {
 		os.Setenv(ext_mongo_port_env, strconv.Itoa(test_port))
 	}
+	cfg = DbConfig{
+		DbName: test_db_name,
+		Select: "mongo",
+		Config: map[string]interface{}{
+			"Address": os.Getenv(ext_mongo_hostname_env),
+			"Port":    first(strconv.Atoi(os.Getenv(ext_mongo_port_env)))},
+	}
 
-	m := NewMongoClient()
-
+	m := NewMongoClient(cfg)
 	log.SetOutput(ioutil.Discard)
 	log.Infof("Dropping db %s to make sure we're clean", test_db_name)
 
@@ -34,7 +40,7 @@ func init() {
 }
 
 func TestDeleteVolume(t *testing.T) {
-	c := NewMongoVolumeClient(NewMongoClient(), test_db_name)
+	c := NewMongoVolumeClient(NewMongoClient(cfg), test_db_name)
 	vol := models.FlowifyVolume{
 		Workspace: "test",
 		Uid:       models.NewComponentReference(),
@@ -83,7 +89,7 @@ func TestDeleteVolume(t *testing.T) {
 }
 
 func TestGetVolume(t *testing.T) {
-	c := NewMongoVolumeClient(NewMongoClient(), test_db_name)
+	c := NewMongoVolumeClient(NewMongoClient(cfg), test_db_name)
 
 	vol := models.FlowifyVolume{
 		Workspace: "test",
@@ -142,7 +148,7 @@ func TestGetVolume(t *testing.T) {
 }
 
 func TestPutVolume(t *testing.T) {
-	c := NewMongoVolumeClient(NewMongoClient(), test_db_name)
+	c := NewMongoVolumeClient(NewMongoClient(cfg), test_db_name)
 
 	vol := models.FlowifyVolume{
 		Workspace: "test",
@@ -228,11 +234,11 @@ func TestPutVolume(t *testing.T) {
 }
 
 func TestListVolumes(t *testing.T) {
-	c := NewMongoVolumeClient(NewMongoClient(), test_db_name)
+	c := NewMongoVolumeClient(NewMongoClient(cfg), test_db_name)
 
 	{
 		// drop db to make sure that at the end DB will contain one components
-		NewMongoClient().Database(test_db_name).Drop(context.TODO())
+		NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
 
 		// first add components to list
 		for i := 0; i < 5; i++ {

@@ -10,11 +10,13 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/storage"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -63,11 +65,49 @@ func parseInput(doc []byte) (interface{}, error) {
 	return models.ComponentReference{}, fmt.Errorf("could not parse '%s'", doc)
 }
 
+func LoadDbConfig(path string) (config storage.DbConfig, err error) {
+	viper.AddConfigPath(path)
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AutomaticEnv() // let env override config if available
+
+	// to allow environment parse nested config
+	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`))
+
+	// prefix all envs for uniqueness
+	viper.SetEnvPrefix("FLOWIFY")
+
+	err = viper.ReadInConfig()
+	if err != nil {
+		return
+	}
+
+	err = viper.Unmarshal(&config)
+	return
+}
+
+func isFlagPassed(name string) bool {
+	found := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
 func main() {
 	log.SetLevel(log.InfoLevel)
 
+	// read config, possible overloaded by ENV VARS
+	cfg, err := LoadDbConfig(".")
+
 	fileName := flag.String("file", "", "Read from file instead of cmd line arg, '-' for stdin")
 	dbName := flag.String("db", "Flowify", "Set the name of the database to use")
+	if isFlagPassed("db") {
+		cfg.DbName = *dbName
+	}
+
 	flag.Parse()
 	flag.Usage = myUsage
 
@@ -105,7 +145,7 @@ func main() {
 	}
 
 	var component models.Component
-	cstorage := storage.NewMongoStorageClient(storage.NewMongoClient(), *dbName)
+	cstorage := storage.NewMongoStorageClient(storage.NewMongoClient(cfg), cfg.DbName)
 
 	switch concrete := any.(type) {
 	case models.ComponentReference:

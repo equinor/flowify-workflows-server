@@ -37,6 +37,7 @@ func TestLiveEndpoint(t *testing.T) {
 
 	server, _ := apiserver.NewFlowifyServer(
 		kubeclient,
+		test_namespace,
 		wfclient,
 		nodeStorage,
 		volumeStorage,

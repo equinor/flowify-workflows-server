@@ -26,9 +26,10 @@ func Test_Routes(t *testing.T) {
 
 	fs, err := NewFlowifyServer(
 		fake.NewSimpleClientset(),
-		nil, /* wfclient cs_workflow.Interface */
-		nil, /* storage  */
-		nil, /* volumeStorage  */
+		"not-used", /* config namespace for k8s */
+		nil,        /* wfclient cs_workflow.Interface */
+		nil,        /* storage  */
+		nil,        /* volumeStorage  */
 		1234,
 		auth.AzureTokenAuthenticator{},
 	)

@@ -19,7 +19,7 @@ export FLOWIFY_MONGO_ADDRESS=localhost
 export FLOWIFY_MONGO_PORT=27017
 
 killall flowify-workflows-server -vq || printf "flowify-workflows-server not running, restarting\n"
-FLOWIFY_K8S_NAMESPACE=$configns ../build/flowify-workflows-server -flowify-auth azure-oauth2-openid-token  & #> /tmp/test.out 2>& 1 &
+../build/flowify-workflows-server -flowify-auth azure-oauth2-openid-token -namespace $configns & #> /tmp/test.out 2>& 1 &
 printf "flowify-workflows-server started: $!\n" # Prints the PID of the flowify server so we can hook-up a debugger
 
 # Start a MongoDB server

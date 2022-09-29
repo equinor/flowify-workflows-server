@@ -1,0 +1,48 @@
+db:
+  # select which db to use
+  select: mongo
+  # the flowify document database
+  dbname: test
+#  mongo:
+  config:
+    # Mongo fields
+    # (FLOWIFY_)DB_CONFIG_ADDRESS=...
+    # url to database
+    address: localhost
+    # port where mongo is listening
+    port: 27017
+
+    # Cosmos fields
+    # export (FLOWIFY_)DB_CONFIG_CREDENTIALS=...
+    credentials: SET_FROM_ENV
+
+kubernetes:
+  # how to locate the kubernetes server
+  kubeconfig: SET_FROM_ENV
+  # the namespace containing the flowify configuration and setup
+  namespace: flowify
+
+auth:
+  handler: azure-oauth2-openid-token
+  config:
+    issuer: sandbox
+    audience: flowify
+#    keysurl: http://localhost:32023/jwkeys/
+    keysurl: SET_FROM_ENV
+
+#auth:
+#  handler: disabled-auth
+#  config:
+#    uid: "0"
+#    name: Auth Disabled
+#    email: auth@disabled.com
+#    roles:
+#      - tester
+#      - dummy
+
+logging:
+  loglevel: info
+
+server:
+  port: 8443
+

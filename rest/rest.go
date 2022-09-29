@@ -11,6 +11,7 @@ import (
 	argoclient "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/models"
+	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/storage"
 	userpkg "github.com/equinor/flowify-workflows-server/user"
 
@@ -96,12 +97,12 @@ func WriteErrorResponse(w http.ResponseWriter, apierr APIError, tag string) {
 	WriteResponse(w, apierr.Code, nil, apierr, tag)
 }
 
-func RegisterRoutes(r *mux.Route, componentClient storage.ComponentClient, volumeClient storage.VolumeClient, argoclient argoclient.Interface, k8sclient kubernetes.Interface, sec auth.AuthClient) {
+func RegisterRoutes(r *mux.Route, componentClient storage.ComponentClient, volumeClient storage.VolumeClient, argoclient argoclient.Interface, k8sclient kubernetes.Interface, sec auth.AuthClient, wsclient workspace.WorkspaceClient) {
 	subrouter := r.Subrouter()
 
 	// require authenticated context (with TokenClaims values `GetTokenClaims`)
 	subrouter.Use(NewAuthenticationMiddleware(sec))
-	subrouter.Use(NewAuthorizationContext(k8sclient))
+	subrouter.Use(NewAuthorizationContext(wsclient))
 
 	RegisterOpenApiRoutes(subrouter.PathPrefix("/spec"))
 	RegisterUserInfoRoutes(subrouter.PathPrefix(""))

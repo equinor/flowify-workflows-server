@@ -5,15 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	osuser "os/user"
-	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/MicahParks/keyfunc"
 	wfclientset "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"k8s.io/client-go/kubernetes"
 	k8srest "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -21,12 +19,64 @@ import (
 	"github.com/equinor/flowify-workflows-server/apiserver"
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/storage"
-	"github.com/equinor/flowify-workflows-server/user"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
 	maxWait = time.Second * 10
 )
+
+type KubernetesKonfig struct {
+	KubeConfig string `mapstructure:"kubeconfig"`
+	Namespace  string `mapstructure:"namespace"`
+}
+
+type LogConfig struct {
+	LogLevel string `mapstructure:"loglevel"`
+}
+
+type ServerConfig struct {
+	Port int `mapstructure:"port"`
+}
+
+type Config struct {
+	DbConfig         storage.DbConfig `mapstructure:"db"`
+	KubernetesKonfig KubernetesKonfig `mapstructure:"kubernetes"`
+	AuthConfig       auth.AuthConfig  `mapstructure:"auth"`
+
+	LogConfig    LogConfig    `mapstructure:"logging"`
+	ServerConfig ServerConfig `mapstructure:"server"`
+}
+
+func LoadConfig(path string) (config Config, err error) {
+	viper.AddConfigPath(path)
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+
+	viper.AutomaticEnv() // let env override config if available
+
+	// to allow environment parse nested config
+	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`))
+
+	// prefix all envs for uniqueness
+	viper.SetEnvPrefix("FLOWIFY")
+
+	err = viper.ReadInConfig()
+	if err != nil {
+		return
+	}
+
+	/*
+		for _, k := range viper.AllKeys() {
+			value := viper.GetString(k)
+			log.Infoln(k, " : ", value)
+		}
+	*/
+
+	err = viper.Unmarshal(&config)
+	return
+}
 
 var status = 0
 
@@ -37,116 +87,98 @@ func logFatalHandler() {
 	select {}
 }
 
-func resolveAuthClient(spec *string) (auth.AuthClient, error) {
-	if *spec == "" {
-		return nil, fmt.Errorf("no auth handler selected")
-	}
-
-	switch *spec {
-	case "azure-oauth2-openid-token":
-		{
-			const (
-				JWT_ISSUER_CLAIM = "TENANT_ID"
-				JWT_AUD_CLAIM    = "CLIENT_ID"
-				JWT_KEYS_URL     = "JWKS_URI"
-			)
-
-			iss, ok := os.LookupEnv(JWT_ISSUER_CLAIM)
-			if !ok {
-				return nil, fmt.Errorf("env %s missing", JWT_ISSUER_CLAIM)
-			}
-
-			aud, ok := os.LookupEnv(JWT_AUD_CLAIM)
-			if !ok {
-				return nil, fmt.Errorf("env %s missing", JWT_AUD_CLAIM)
-			}
-
-			kUrl, ok := os.LookupEnv(JWT_KEYS_URL)
-			if !ok {
-				return nil, fmt.Errorf("env %s missing", JWT_KEYS_URL)
-			}
-
-			opts := auth.AzureTokenAuthenticatorOptions{}
-			var jwks auth.AzureKeyFunc
-			if kUrl == "DISABLE_JWT_SIGNATURE_VERIFICATION" {
-				log.Warn("running the authenticator without signature verification is UNSAFE")
-				opts.DisableVerification = true
-			} else {
-				// Create the JWKS from the resource at the given URL.
-				JWKS, err := keyfunc.Get(kUrl, keyfunc.Options{
-					// best practices for azure key roll-over: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-signing-key-rollover
-					RefreshInterval:  time.Hour * 24,
-					RefreshRateLimit: time.Minute * 5,
-					// when encountering a "new" key id, allow immediate refresh (rate limited)
-					RefreshUnknownKID: true,
-					// make sure errors make it into the log
-					RefreshErrorHandler: func(err error) { log.Error("jwks refresh error:", err) },
-				})
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to get the JWKS")
-				}
-				jwks = JWKS.Keyfunc
-			}
-
-			return auth.AzureTokenAuthenticator{Issuer: iss, Audience: aud, KeyFunc: jwks, Options: opts}, nil
+func isFlagPassed(name string) bool {
+	found := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
 		}
-
-	case "disabled-auth":
-		{
-			log.Warn("flowify started with no authentication and static dummy-authorization")
-			return auth.MockAuthenticator{
-				User: user.MockUser{
-					Uid:   "0",
-					Name:  "Auth Disabled",
-					Email: "auth@disabled",
-					Roles: []user.Role{"tester", "dummy"},
-				},
-			}, nil
-		}
-	default:
-		{
-			return nil, fmt.Errorf("auth handler (%s) not supported", *spec)
-		}
-	}
+	})
+	return found
 }
+
+func first[T any, S any](t T, s S) T { return t }
 
 func main() {
 	log.Infof("Starting process with pid %d", os.Getpid())
 	log.RegisterExitHandler(logFatalHandler)
 
-	logLevel := flag.Int("v", 4 /* Info */, "Set the printout level for the logger (0 -- 6)")
-	portNumber := flag.Int("p", 8842 /* Info */, "Set the TCP port nubmer accepting connections")
-	dbName := flag.String("db", "Flowify", "Set the name of the database to use")
-	authHandlerSelector := flag.String("flowify-auth", "azure-oauth2-openid-token", "Set the security handler for the backend")
+	// read config, possible overloaded by ENV VARS
+	cfg, err := LoadConfig(".")
 
-	path, err := findKubeConfig()
-	if err != nil {
-		log.Info("No local kubeconfig setup detected")
-		path = ""
-	}
-	kubeconfig := flag.String("kubeconfig", path, "kubeconfig file")
+	// Set some common flags
+	logLevel := flag.String("loglevel", "info", "Set the printout level for the logger (trace, debug, info, warn, error, fatal, panic)")
+	portNumber := flag.Int("port", 8842, "Set the TCP port nubmer accepting connections")
+	dbName := flag.String("db", "Flowify", "Set the name of the database to use")
+	k8sConfigNamespace := flag.String("namespace", "test", "K8s configuration namespace to use")
+	authHandlerSelector := flag.String("auth", "azure-oauth2-openid-token", "Set the security handler for the backend")
+	kubeconfig := flag.String("kubeconfig", "~/kube/config", "path to kubeconfig file")
+	dumpConfig := flag.String("dumpconfig", "", "Dump the config in yaml format to filename or stdout '-'")
 	flag.Parse()
 
-	log.SetLevel(log.Level(*logLevel))
-	log.WithFields(log.Fields{"Loglevel": log.StandardLogger().Level}).Infof("setting loglevel")
+	// Connect flags to override config (flags > env > configfile )
+	// viper nested keys dont work well with flags so do it explicitly: https://github.com/spf13/viper/issues/368
+	if isFlagPassed("loglevel") {
+		cfg.LogConfig.LogLevel = *logLevel
+	}
+	if isFlagPassed("port") {
+		cfg.ServerConfig.Port = *portNumber
+	}
+	if isFlagPassed("db") {
+		cfg.DbConfig.DbName = *dbName
+	}
+	if isFlagPassed("kubeconfig") {
+		cfg.KubernetesKonfig.KubeConfig = *kubeconfig
+	}
+	if isFlagPassed("namespace") {
+		cfg.KubernetesKonfig.Namespace = *k8sConfigNamespace
+	}
+	if isFlagPassed("auth") {
+		cfg.AuthConfig.Handler = *authHandlerSelector
+	}
 
-	config, err := k8srest.InClusterConfig()
+	// handle config output
+	if isFlagPassed("dumpconfig") {
+		switch *dumpConfig {
+		case "-":
+			// stdout
+			bytes, err := yaml.Marshal(viper.AllSettings())
+			if err != nil {
+				log.Error("Could not dump config", err)
+				return
+			}
+			fmt.Println(string(bytes))
+		default:
+			viper.WriteConfigAs(*dumpConfig)
+		}
+	}
 
+	// LogConfig is handled directly
+	level, err := log.ParseLevel(cfg.LogConfig.LogLevel)
+	if err != nil {
+		log.Errorf("could not parse log level: %s", cfg.LogConfig)
+	}
+	log.SetLevel(level)
+	log.WithFields(log.Fields{"Loglevel": log.StandardLogger().Level}).Infof("Setting global loglevel")
+
+	// Kubernetes config
+	k8sConfig, err := k8srest.InClusterConfig()
 	if err != nil {
 		log.Infof("No service account detected, running locally")
 
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		k8sConfig, err = clientcmd.BuildConfigFromFlags("", cfg.KubernetesKonfig.KubeConfig)
 
 		if err != nil {
-			log.Errorf("Cannot load .kube/config file")
+			log.Errorf("Cannot load .kube/config from %v: %v", cfg.KubernetesKonfig.KubeConfig, err)
 			return
 		}
 	}
 
-	kubeclient := kubernetes.NewForConfigOrDie(config)
-	wfclient := wfclientset.NewForConfigOrDie(config)
+	kubeclient := kubernetes.NewForConfigOrDie(k8sConfig)
+	argoClient := wfclientset.NewForConfigOrDie(k8sConfig)
 
-	authClient, err := resolveAuthClient(authHandlerSelector)
+	// Auth config
+	authClient, err := auth.ResolveAuthClient(cfg.AuthConfig)
 	if err != nil {
 		log.Fatalf("no auth handler set, %v", err)
 	}
@@ -155,10 +187,11 @@ func main() {
 	defer cancel()
 
 	server, err := apiserver.NewFlowifyServer(kubeclient,
-		wfclient,
-		storage.NewMongoStorageClient(storage.NewMongoClient(), *dbName),
-		storage.NewMongoVolumeClient(storage.NewMongoClient(), *dbName),
-		*portNumber,
+		cfg.KubernetesKonfig.Namespace,
+		argoClient,
+		storage.NewMongoStorageClient(storage.NewMongoClient(cfg.DbConfig), cfg.DbConfig.DbName),
+		storage.NewMongoVolumeClient(storage.NewMongoClient(cfg.DbConfig), cfg.DbConfig.DbName),
+		cfg.ServerConfig.Port,
 		authClient,
 	)
 
@@ -176,23 +209,4 @@ func main() {
 	server.HttpServer.Shutdown(ctx)
 
 	os.Exit(status)
-}
-
-func findKubeConfig() (string, error) {
-	env := os.Getenv("KUBECONFIG")
-
-	if env != "" {
-		log.Info(fmt.Sprintf("using environment var KUBECONFIG (%s) to locate .kube/config", env))
-		return env, nil
-	}
-
-	usr, err := osuser.Current()
-	if err != nil {
-		log.Error("no current user found when looking for .kube/config")
-		return "", err
-	}
-
-	log.Info(fmt.Sprintf("Using current user home dir '%s' to locate .kube/config", usr.HomeDir))
-
-	return filepath.Join(usr.HomeDir, ".kube/config"), nil
 }

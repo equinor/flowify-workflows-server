@@ -61,6 +61,16 @@ type AzureTokenAuthenticator struct {
 	Options AzureTokenAuthenticatorOptions
 }
 
+func NewAzureTokenAuthenticator(KeyFunc AzureKeyFunc,
+	Audience string,
+	Issuer string,
+	Options AzureTokenAuthenticatorOptions) AuthClient {
+
+	return AzureTokenAuthenticator{KeyFunc: KeyFunc,
+		Audience: Audience, Issuer: Issuer,
+		Options: Options}
+}
+
 func (a AzureTokenAuthenticator) Authenticate(r *http.Request) (user.User, error) {
 	authStr := r.Header.Get("Authorization")
 
