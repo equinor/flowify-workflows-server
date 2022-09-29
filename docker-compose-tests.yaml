@@ -13,8 +13,8 @@ services:
       context: .
       target: tester
     environment:
-      FLOWIFY_MONGO_ADDRESS: mongo
-      FLOWIFY_MONGO_PORT: 27017
+      FLOWIFY_DB_CONFIG_ADDRESS: mongo
+      FLOWIFY_DB_CONFIG_PORT: 27017
     depends_on:
       - mongo
     volumes:
