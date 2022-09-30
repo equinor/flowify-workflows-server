@@ -85,8 +85,6 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
 		return true, nil
 	})
 
-	defer conn.Close()
-
 	if err != nil {
 		log.Error(errors.Wrapf(err, "cannot create listener on socket %s", address))
 		if readyNotifier != nil {
@@ -95,6 +93,7 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
 		}
 		panic("") // no return
 	}
+	defer conn.Close()
 
 	go func() { fs.HttpServer.Serve(conn) }()
 	log.WithFields(log.Fields{"version": CommitSHA, "port": address}).Info("✨ Flowify server started successfully ✨")

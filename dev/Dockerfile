@@ -42,8 +42,13 @@ ENV PATH="${PATH}:/root"
 
 FROM buildbase as devserver
 COPY apiserver ./apiserver
+COPY auth ./auth
+COPY models ./models
 COPY pkg ./pkg
-COPY v2 ./v2
+COPY rest ./rest
+COPY storage ./storage
+COPY transpiler ./transpiler
+COPY user ./user
 COPY main.go .
 COPY Makefile .
 RUN ["/bin/bash", "-c", "make server"]
