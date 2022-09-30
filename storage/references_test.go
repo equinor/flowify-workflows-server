@@ -1,14 +1,14 @@
-package storage
+package storage_test
 
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"strconv"
 	"testing"
 
 	"github.com/equinor/flowify-workflows-server/models"
+	"github.com/equinor/flowify-workflows-server/storage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -336,19 +336,11 @@ func init() {
 	}
 }
 
-func first(i int, e error) int { return i }
-
 func TestDereferenceComponent(t *testing.T) {
-	cfg := DbConfig{
-		DbName: test_db_name,
-		Select: "mongo",
-		Config: map[string]interface{}{
-			"Address": os.Getenv("FLOWIFY_DB_CONFIG_ADDRESS"),
-			"Port":    first(strconv.Atoi(os.Getenv("FLOWIFY_DB_CONFIG_PORT")))},
-	}
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), cfg.DbName)
-	err := cstorage.CreateComponent(context.TODO(), brickCmp)
+	err = cstorage.CreateComponent(context.TODO(), brickCmp)
 	assert.Nil(t, err)
 	err = cstorage.CreateComponent(context.TODO(), graphCmp)
 	assert.Nil(t, err)
@@ -360,12 +352,12 @@ func TestDereferenceComponent(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Test dereference of ComponentReference
-	cmpObj, err := DereferenceComponent(context.TODO(), cstorage, cmpRef)
+	cmpObj, err := storage.DereferenceComponent(context.TODO(), cstorage, cmpRef)
 	assert.Nil(t, err)
 	assert.Equal(t, brickCmp, cmpObj)
 
 	// Test dereference of Component with nested ComponentReferences
-	cmpObj, err = DereferenceComponent(context.TODO(), cstorage, graphCmp)
+	cmpObj, err = storage.DereferenceComponent(context.TODO(), cstorage, graphCmp)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedGraphCmp, cmpObj)
 }

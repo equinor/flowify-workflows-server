@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	k8srest "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var backoff = wait.Backoff{
@@ -34,6 +36,28 @@ var backoff = wait.Backoff{
 var CommitSHA = "unknown"
 var BuildTime = "unknown"
 
+type KubernetesKonfig struct {
+	KubeConfig string `mapstructure:"kubeconfig"`
+	Namespace  string `mapstructure:"namespace"`
+}
+
+type LogConfig struct {
+	LogLevel string `mapstructure:"loglevel"`
+}
+
+type ServerConfig struct {
+	Port int `mapstructure:"port"`
+}
+
+type Config struct {
+	DbConfig         storage.DbConfig `mapstructure:"db"`
+	KubernetesKonfig KubernetesKonfig `mapstructure:"kubernetes"`
+	AuthConfig       auth.AuthConfig  `mapstructure:"auth"`
+
+	LogConfig    LogConfig    `mapstructure:"logging"`
+	ServerConfig ServerConfig `mapstructure:"server"`
+}
+
 type flowifyServer struct {
 	k8Client      kubernetes.Interface
 	namespace     string
@@ -44,6 +68,61 @@ type flowifyServer struct {
 	portnumber    int
 	HttpServer    *http.Server
 	auth          auth.AuthClient
+}
+
+func (f *flowifyServer) GetKubernetesClient() kubernetes.Interface {
+	return f.k8Client
+}
+
+func (f *flowifyServer) GetAddress() string {
+	return f.HttpServer.Addr
+}
+
+func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
+
+	// Kubernetes config
+	k8sConfig, err := k8srest.InClusterConfig()
+	if err != nil {
+		log.Infof("No service account detected, running locally")
+
+		k8sConfig, err = clientcmd.BuildConfigFromFlags("", cfg.KubernetesKonfig.KubeConfig)
+
+		if err != nil {
+			log.Errorf("Cannot load .kube/config from %v: %v", cfg.KubernetesKonfig.KubeConfig, err)
+			return flowifyServer{}, errors.Wrap(err, "could not create ApiServer from config")
+		}
+	}
+
+	kubeClient := kubernetes.NewForConfigOrDie(k8sConfig)
+	argoClient := argo_workflow.NewForConfigOrDie(k8sConfig)
+
+	nodeStorage, err := storage.NewMongoStorageClientFromConfig(cfg.DbConfig, nil)
+	if err != nil {
+		return flowifyServer{}, errors.Wrap(err, "could not create new node storage")
+	}
+
+	volumeStorage, err := storage.NewMongoVolumeClientFromConfig(cfg.DbConfig, nil)
+	if err != nil {
+		return flowifyServer{}, errors.Wrap(err, "could not create new volume storage")
+	}
+
+	workspace := workspace.NewWorkspaceClient(kubeClient, cfg.KubernetesKonfig.Namespace)
+
+	authClient, err := auth.NewAuthClientFromConfig(cfg.AuthConfig)
+	if err != nil {
+		return flowifyServer{}, errors.Wrap(err, "could not create auth")
+	}
+
+	return flowifyServer{
+		k8Client:      kubeClient,
+		namespace:     cfg.KubernetesKonfig.Namespace,
+		wfClient:      argoClient,
+		nodeStorage:   nodeStorage,
+		volumeStorage: volumeStorage,
+		workspace:     workspace,
+		portnumber:    cfg.ServerConfig.Port,
+		auth:          authClient,
+	}, nil
 }
 
 func NewFlowifyServer(k8Client kubernetes.Interface,
@@ -85,8 +164,6 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
 		return true, nil
 	})
 
-	defer conn.Close()
-
 	if err != nil {
 		log.Error(errors.Wrapf(err, "cannot create listener on socket %s", address))
 		if readyNotifier != nil {
@@ -95,6 +172,7 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
 		}
 		panic("") // no return
 	}
+	defer conn.Close()
 
 	go func() {
 		err := fs.HttpServer.Serve(conn)

@@ -57,4 +57,12 @@ docker_test:
 	docker-compose -f docker-compose-tests.yaml build
 	docker-compose -f docker-compose-tests.yaml up --exit-code-from app
 
+docker_e2e_test:
+# build base services
+	docker-compose -f dev/docker-compose.yaml build 
+# build composed testrunner image
+	docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml build flowify-e2e-runner
+# run the testrunner container 
+	docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml run  --rm flowify-e2e-runner
+
 .PHONY: all server init clean test docker_test e2etest

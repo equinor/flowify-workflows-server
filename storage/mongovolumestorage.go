@@ -7,7 +7,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -22,12 +22,25 @@ const (
 	volumeCollection = "Volumes"
 )
 
-func NewMongoVolumeClient(client *mongo.Client, dbname string) VolumeClient {
-	if client == nil || client.Ping(context.TODO(), nil) != nil {
-		logrus.Fatal("Cannot connect to database. Check that a working Mongo client is passed")
+func NewMongoVolumeClientFromConfig(config DbConfig, client *mongo.Client) (VolumeClient, error) {
+	// check that client is ok
+	if client == nil {
+		log.Info("Nil mongo client is passed so a new client will be created. It is good practice to share clients")
+		nclient, err := NewMongoClientFromConfig(config)
+		if err != nil {
+			log.Error("Cannot create new client")
+			return nil, errors.Wrap(err, "Could not create new mongo client")
+		}
+		client = nclient
 	}
-	logrus.Infof("V: Connected to mongodb with name %s", dbname)
-	return &MongoVolumeClientImpl{client: client, db_name: dbname}
+
+	if client.Ping(context.TODO(), nil) != nil {
+		log.Error("Cannot connect to database. Check configuration")
+		return &MongoVolumeClientImpl{}, fmt.Errorf("Cannot connect to database. Check configuration")
+	}
+
+	log.Infof("Connected to mongodb (%s), with db name %s", config, config.DbName)
+	return &MongoVolumeClientImpl{client: client, db_name: config.DbName}, nil
 }
 
 func (c *MongoVolumeClientImpl) getVolumeCollection() *mongo.Collection {

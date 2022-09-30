@@ -1,9 +1,8 @@
-package storage
+package storage_test
 
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
@@ -11,11 +10,16 @@ import (
 
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
+	"github.com/equinor/flowify-workflows-server/storage"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+func first[T any, S any](t T, s S) T { return t }
 
 const (
 	test_host              = "localhost"
@@ -25,7 +29,10 @@ const (
 	test_db_name           = "flowify-test"
 )
 
-var cfg DbConfig
+var cfg storage.DbConfig
+
+// the mongo client/db is shared between the tests in package (storage_test), so tests cant run in parallell
+var mclient *mongo.Client
 
 func init() {
 	if _, exists := os.LookupEnv(ext_mongo_hostname_env); !exists {
@@ -36,7 +43,7 @@ func init() {
 		os.Setenv(ext_mongo_port_env, strconv.Itoa(test_port))
 	}
 
-	cfg = DbConfig{
+	cfg = storage.DbConfig{
 		DbName: test_db_name,
 		Select: "mongo",
 		Config: map[string]interface{}{
@@ -44,13 +51,8 @@ func init() {
 			"Port":    first(strconv.Atoi(os.Getenv(ext_mongo_port_env)))},
 	}
 
-	m := NewMongoClient(cfg)
-
-	log.SetOutput(ioutil.Discard)
-	log.Infof("Dropping db %s to make sure we're clean", test_db_name)
-
-	m.Database(test_db_name).Drop(context.TODO())
-
+	mclient, _ = storage.NewMongoClientFromConfig(cfg)
+	log.Info("Creating a shared db connector")
 }
 
 // models.ComponentReference(uuid.MustParse("8c4f562a-a6b4-11ec-b909-0242ac120002"))
@@ -112,14 +114,17 @@ func makeJob(meta *models.Metadata, workspace string) models.Job {
 
 func TestCreateComponent(t *testing.T) {
 
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
-	err := cstorage.CreateComponent(context.TODO(), makeComponent(nil))
+	err = cstorage.CreateComponent(context.TODO(), makeComponent(nil))
 	assert.Nil(t, err)
 }
 
 func TestGetComponent(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
+
 	cmpv1 := makeComponent(nil)
 	cmpv2 := cmpv1
 	cmpv2.Description = "Second version of document"
@@ -156,8 +161,11 @@ func TestGetComponent(t *testing.T) {
 }
 
 func TestDeleteDocument(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
-	NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
+
+	mclient.Database(test_db_name).Drop(context.TODO())
+
 	ws_test := "ws-test"
 	authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: ws_test, HasAccess: true}})
 	cmp := makeComponent(nil)
@@ -198,7 +206,7 @@ func TestDeleteDocument(t *testing.T) {
 
 	type testCase struct {
 		Name               string
-		Kind               DocumentKind
+		Kind               storage.DocumentKind
 		Id                 models.CRefVersion
 		AuthzContext       context.Context
 		ExpectedResult     models.CRefVersion
@@ -209,7 +217,7 @@ func TestDeleteDocument(t *testing.T) {
 	testCases := []testCase{
 		{
 			Name:               "Delete component, bad uid",
-			Kind:               ComponentKind,
+			Kind:               storage.ComponentKind,
 			Id:                 models.CRefVersion{},
 			AuthzContext:       context.TODO(),
 			ExpectedResult:     models.CRefVersion{},
@@ -218,7 +226,7 @@ func TestDeleteDocument(t *testing.T) {
 		},
 		{
 			Name:               "Delete component v.2",
-			Kind:               ComponentKind,
+			Kind:               storage.ComponentKind,
 			Id:                 models.CRefVersion{Uid: cmp_v2.Uid, Version: cmp_v2.Version.Current},
 			AuthzContext:       context.TODO(),
 			ExpectedResult:     models.CRefVersion{Uid: cmp_v2.Uid, Version: cmp_v2.Version.Current},
@@ -227,7 +235,7 @@ func TestDeleteDocument(t *testing.T) {
 		},
 		{
 			Name:               "Delete workflow, no access",
-			Kind:               WorkflowKind,
+			Kind:               storage.WorkflowKind,
 			Id:                 models.CRefVersion{Uid: wf_v1.Uid, Version: wf_v1.Version.Current},
 			AuthzContext:       context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test", HasAccess: true}}),
 			ExpectedResult:     models.CRefVersion{},
@@ -236,7 +244,7 @@ func TestDeleteDocument(t *testing.T) {
 		},
 		{
 			Name:               "Delete workflow v. 1",
-			Kind:               WorkflowKind,
+			Kind:               storage.WorkflowKind,
 			Id:                 models.CRefVersion{Uid: wf_v1.Uid, Version: wf_v1.Version.Current},
 			AuthzContext:       authzCtx,
 			ExpectedResult:     models.CRefVersion{Uid: wf_v1.Uid, Version: wf_v1.Version.Current},
@@ -245,7 +253,7 @@ func TestDeleteDocument(t *testing.T) {
 		},
 		{
 			Name:               "Delete workflow v. 2",
-			Kind:               WorkflowKind,
+			Kind:               storage.WorkflowKind,
 			Id:                 models.CRefVersion{Uid: wf_v2.Uid, Version: wf_v2.Version.Current},
 			AuthzContext:       authzCtx,
 			ExpectedResult:     models.CRefVersion{Uid: wf_v2.Uid, Version: wf_v2.Version.Current},
@@ -254,7 +262,7 @@ func TestDeleteDocument(t *testing.T) {
 		},
 		{
 			Name:               "Delete job, bad uid",
-			Kind:               JobKind,
+			Kind:               storage.JobKind,
 			Id:                 models.CRefVersion{},
 			AuthzContext:       authzCtx,
 			ExpectedResult:     models.CRefVersion{},
@@ -263,7 +271,7 @@ func TestDeleteDocument(t *testing.T) {
 		},
 		{
 			Name:               "Delete job, no access",
-			Kind:               JobKind,
+			Kind:               storage.JobKind,
 			Id:                 models.CRefVersion{Uid: job.Uid},
 			AuthzContext:       context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test", HasAccess: true}}),
 			ExpectedResult:     models.CRefVersion{},
@@ -272,7 +280,7 @@ func TestDeleteDocument(t *testing.T) {
 		},
 		{
 			Name:               "Delete job",
-			Kind:               JobKind,
+			Kind:               storage.JobKind,
 			Id:                 models.CRefVersion{Uid: job.Uid},
 			AuthzContext:       authzCtx,
 			ExpectedResult:     models.CRefVersion{Uid: job.Uid},
@@ -290,16 +298,16 @@ func TestDeleteDocument(t *testing.T) {
 				assert.Equal(t, test.ExpectedResult, result)
 			}
 			switch test.Kind {
-			case ComponentKind:
-				lst, err := cstorage.ListComponentsMetadata(authzCtx, Pagination{Limit: 10}, nil, nil)
+			case storage.ComponentKind:
+				lst, err := cstorage.ListComponentsMetadata(authzCtx, storage.Pagination{Limit: 10}, nil, nil)
 				assert.Nil(t, err)
 				assert.Equal(t, test.ExpectedDbDocCount, len(lst.Items))
-			case WorkflowKind:
-				lst, err := cstorage.ListWorkflowsMetadata(authzCtx, Pagination{Limit: 10}, nil, nil)
+			case storage.WorkflowKind:
+				lst, err := cstorage.ListWorkflowsMetadata(authzCtx, storage.Pagination{Limit: 10}, nil, nil)
 				assert.Nil(t, err)
 				assert.Equal(t, test.ExpectedDbDocCount, len(lst.Items))
-			case JobKind:
-				lst, err := cstorage.ListJobsMetadata(authzCtx, Pagination{Limit: 10}, nil, nil)
+			case storage.JobKind:
+				lst, err := cstorage.ListJobsMetadata(authzCtx, storage.Pagination{Limit: 10}, nil, nil)
 				assert.Nil(t, err)
 				assert.Equal(t, test.ExpectedDbDocCount, len(lst.Items))
 			}
@@ -308,7 +316,9 @@ func TestDeleteDocument(t *testing.T) {
 }
 
 func TestDeleteComponentVersions(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
+
 	cmp := makeComponent(nil)
 	{
 		// first add component to get
@@ -330,11 +340,11 @@ func TestDeleteComponentVersions(t *testing.T) {
 	assert.Equal(t, cmp, cmp_v1)
 
 	badId := models.CRefVersion{}
-	_, err = cstorage.DeleteDocument(context.TODO(), WorkflowKind, badId)
+	_, err = cstorage.DeleteDocument(context.TODO(), storage.WorkflowKind, badId)
 	assert.Error(t, err)
 
 	idV2 := models.CRefVersion{Uid: cmp.Uid, Version: cmp_v2.Version.Current}
-	cref, err := cstorage.DeleteDocument(context.TODO(), ComponentKind, idV2)
+	cref, err := cstorage.DeleteDocument(context.TODO(), storage.ComponentKind, idV2)
 	assert.Nil(t, err)
 	assert.Equal(t, idV2, cref)
 
@@ -345,12 +355,15 @@ func TestDeleteComponentVersions(t *testing.T) {
 }
 
 func TestListComponents(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
+
 	Day := time.Duration(time.Hour * 24)
 	Days := func(i int) time.Duration { return time.Duration(i) * Day }
 	{
 		// drop db to make sure that at the end DB will contain one components
-		NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
+		mclient.Database(test_db_name).Drop(context.TODO())
+
 		// first add components to list
 		for i := 0; i < 5; i++ {
 			err := cstorage.CreateComponent(context.TODO(),
@@ -380,33 +393,33 @@ func TestListComponents(t *testing.T) {
 		Name            string   // name
 		Filters         []string // input
 		Sorting         []string
-		Pagination      Pagination
+		Pagination      storage.Pagination
 		ExpectedLength  int
 		FirstItemAuthor models.ModifiedBy // the author of the first item in the returned list
 	}{
-		{"Empty filter100-0", nil, []string{"-timestamp"}, Pagination{Limit: 100, Skip: 0}, 15, models.ModifiedBy{Oid: "2", Email: "snow@google.com"}},
-		{"Empty filter10-0", nil, []string{"+timestamp"}, Pagination{Limit: 10, Skip: 0}, 10, models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}},
-		{"Empty filter10-5", nil, nil, Pagination{Limit: 10, Skip: 5}, 10, models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}},
-		{"Empty filter5-12", nil, nil, Pagination{Limit: 5, Skip: 12}, 3, models.ModifiedBy{Oid: "2", Email: "snow@google.com"}},
-		{"flow@flowify.io", []string{"modifiedBy.email[==]=flow@flowify.io"}, nil, Pagination{Limit: 10, Skip: 0}, 5, models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}},
-		{"swirl@flowify.io", []string{"modifiedBy.email[==]=swirl@flowify.io"}, nil, Pagination{Limit: 10, Skip: 0}, 5, models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}},
-		{"snow@google.com", []string{"modifiedBy.email[==]=snow@google.com"}, nil, Pagination{Limit: 10, Skip: 0}, 5, models.ModifiedBy{Oid: "2", Email: "snow@google.com"}},
+		{"Empty filter100-0", nil, []string{"-timestamp"}, storage.Pagination{Limit: 100, Skip: 0}, 15, models.ModifiedBy{Oid: "2", Email: "snow@google.com"}},
+		{"Empty filter10-0", nil, []string{"+timestamp"}, storage.Pagination{Limit: 10, Skip: 0}, 10, models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}},
+		{"Empty filter10-5", nil, nil, storage.Pagination{Limit: 10, Skip: 5}, 10, models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}},
+		{"Empty filter5-12", nil, nil, storage.Pagination{Limit: 5, Skip: 12}, 3, models.ModifiedBy{Oid: "2", Email: "snow@google.com"}},
+		{"flow@flowify.io", []string{"modifiedBy.email[==]=flow@flowify.io"}, nil, storage.Pagination{Limit: 10, Skip: 0}, 5, models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}},
+		{"swirl@flowify.io", []string{"modifiedBy.email[==]=swirl@flowify.io"}, nil, storage.Pagination{Limit: 10, Skip: 0}, 5, models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}},
+		{"snow@google.com", []string{"modifiedBy.email[==]=snow@google.com"}, nil, storage.Pagination{Limit: 10, Skip: 0}, 5, models.ModifiedBy{Oid: "2", Email: "snow@google.com"}},
 		{"regexp search is case insensitive \\w@FLOWIFY.COM",
 			[]string{"modifiedBy.email[search]=\\w@flowify.io"},
-			nil, Pagination{Limit: 10, Skip: 0}, 10, models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}},
+			nil, storage.Pagination{Limit: 10, Skip: 0}, 10, models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}},
 		{"flow&swirl has no intersection",
 			[]string{"modifiedBy[==]=flow@flowify.io", "modifiedBy[==]=swirl@flowify.io"},
-			nil, Pagination{Limit: 10, Skip: 0}, 0, models.ModifiedBy{}},
+			nil, storage.Pagination{Limit: 10, Skip: 0}, 0, models.ModifiedBy{}},
 		{"before today",
 			[]string{fmt.Sprintf("timestamp[<=]=%s", time.Now().UTC().Format(time.RFC3339))},
-			nil, Pagination{Limit: 10, Skip: 0}, 9, models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}},
+			nil, storage.Pagination{Limit: 10, Skip: 0}, 9, models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}},
 		{"after today",
 			[]string{fmt.Sprintf("timestamp[>]=%s", time.Now().UTC().Format(time.RFC3339))},
-			nil, Pagination{Limit: 10, Skip: 0}, 6, models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}},
+			nil, storage.Pagination{Limit: 10, Skip: 0}, 6, models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}},
 		{"after today, by swirl",
 			[]string{fmt.Sprintf("timestamp[>]=%s", time.Now().UTC().Truncate(time.Second).Format(time.RFC3339)),
 				"modifiedBy.email[==]=swirl@flowify.io"},
-			nil, Pagination{Limit: 10, Skip: 0}, 1, models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}},
+			nil, storage.Pagination{Limit: 10, Skip: 0}, 1, models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}},
 	}
 
 	for _, test := range testCases {
@@ -428,8 +441,11 @@ func TestListComponents(t *testing.T) {
 }
 
 func TestPatchComponent(t *testing.T) {
-	NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	mclient.Database(test_db_name).Drop(context.TODO())
+
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
+
 	cmpV1 := makeComponent(
 		&models.Metadata{
 			Name:       "test-component",
@@ -439,7 +455,7 @@ func TestPatchComponent(t *testing.T) {
 			Version:    models.Version{Current: 1},
 		},
 	)
-	err := cstorage.CreateComponent(context.TODO(), cmpV1)
+	err = cstorage.CreateComponent(context.TODO(), cmpV1)
 	assert.NoError(t, err)
 	err = cstorage.PutComponent(context.TODO(), cmpV1)
 	assert.NoError(t, err)
@@ -535,7 +551,8 @@ func TestCreateWorkflow(t *testing.T) {
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 	}
 
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
@@ -550,7 +567,8 @@ func TestCreateWorkflow(t *testing.T) {
 }
 
 func TestGetWorkflow(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
 	wf := models.Workflow{
 		Metadata:  models.Metadata{Name: "test-wf", Uid: models.NewComponentReference(), Version: models.Version{Current: models.VersionInit, Tags: []string{"latest"}}},
@@ -599,7 +617,8 @@ func TestGetWorkflow(t *testing.T) {
 }
 
 func TestPutWorkflow(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
 	wf := models.Workflow{Metadata: models.Metadata{Name: "test-wf", Uid: models.NewComponentReference()}, Component: makeComponent(nil), Workspace: "test"}
 
@@ -665,13 +684,14 @@ func TestPutWorkflow(t *testing.T) {
 }
 
 func TestListWorkflows(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
 	Day := time.Duration(time.Hour * 24)
 	Days := func(i int) time.Duration { return time.Duration(i) * Day }
 	{
 		// drop db to make sure that at the end DB will contain one components
-		NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
+		mclient.Database(test_db_name).Drop(context.TODO())
 
 		// first add components to list
 		for i := 0; i < 5; i++ {
@@ -774,7 +794,7 @@ func TestListWorkflows(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
 			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
-			list, err := cstorage.ListWorkflowsMetadata(authzCtx, Pagination{20, 0}, test.Filters, test.Sorting)
+			list, err := cstorage.ListWorkflowsMetadata(authzCtx, storage.Pagination{20, 0}, test.Filters, test.Sorting)
 			assert.Equal(t, err, test.ExpectedError)
 			assert.Equal(t, test.ExpectedSize, len(list.Items))
 			if len(list.Items) > 0 && test.Sorting != nil {
@@ -824,7 +844,8 @@ func TestCreateJob(t *testing.T) {
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 	}
 
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
@@ -839,7 +860,8 @@ func TestCreateJob(t *testing.T) {
 }
 
 func TestGetJob(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
 	id := models.NewComponentReference()
 	name := "test-job-" + id.String()[:4]
@@ -887,12 +909,14 @@ func TestGetJob(t *testing.T) {
 }
 
 func TestListJobs(t *testing.T) {
-	cstorage := NewMongoStorageClient(NewMongoClient(cfg), test_db_name)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
+
 	Day := time.Duration(time.Hour * 24)
 	Days := func(i int) time.Duration { return time.Duration(i) * Day }
 	{
 		// drop db to make sure that at the end DB will contain one components
-		NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
+		mclient.Database(test_db_name).Drop(context.TODO())
 
 		// first add components to list
 		for i := 0; i < 5; i++ {
@@ -926,7 +950,7 @@ func TestListJobs(t *testing.T) {
 		Name            string
 		Filters         []string
 		Sorting         []string
-		Pagination      Pagination
+		Pagination      storage.Pagination
 		WorkspaceAccess []workspace.Workspace
 		ExpectedError   error
 		ExpectedSize    int
@@ -936,49 +960,49 @@ func TestListJobs(t *testing.T) {
 		{Name: "No authz context",
 			Filters:         nil,
 			Sorting:         nil,
-			Pagination:      Pagination{10, 0},
+			Pagination:      storage.Pagination{10, 0},
 			WorkspaceAccess: nil,
 			ExpectedError:   nil,
 			ExpectedSize:    0},
 		{Name: "Good authz context",
 			Filters:         nil,
 			Sorting:         nil,
-			Pagination:      Pagination{10, 0},
+			Pagination:      storage.Pagination{10, 0},
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
 			ExpectedError:   nil,
 			ExpectedSize:    5},
 		{Name: "All authz contexts",
 			Filters:         nil,
 			Sorting:         nil,
-			Pagination:      Pagination{20, 0},
+			Pagination:      storage.Pagination{20, 0},
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}, {Name: "test-3", HasAccess: true}},
 			ExpectedError:   nil,
 			ExpectedSize:    15},
 		{Name: "All authz contexts, offset",
 			Filters:         nil,
 			Sorting:         nil,
-			Pagination:      Pagination{10, 5},
+			Pagination:      storage.Pagination{10, 5},
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}, {Name: "test-3", HasAccess: true}},
 			ExpectedError:   nil,
 			ExpectedSize:    10},
 		{Name: "Good authz context and filter",
 			Filters:         []string{"workflow.workspace[==]=test-2"},
 			Sorting:         nil,
-			Pagination:      Pagination{10, 0},
+			Pagination:      storage.Pagination{10, 0},
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}},
 			ExpectedError:   nil,
 			ExpectedSize:    5},
 		{Name: "Authz context with name but no access",
 			Filters:         nil,
 			Sorting:         nil,
-			Pagination:      Pagination{10, 0},
+			Pagination:      storage.Pagination{10, 0},
 			WorkspaceAccess: []workspace.Workspace{{Name: "test-2", HasAccess: false}},
 			ExpectedError:   nil,
 			ExpectedSize:    0},
 		{Name: "Authz context with similar name/access",
 			Filters:         []string{},
 			Sorting:         nil,
-			Pagination:      Pagination{10, 0},
+			Pagination:      storage.Pagination{10, 0},
 			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
 			ExpectedError:   nil,
 			ExpectedSize:    0,
