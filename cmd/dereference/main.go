@@ -145,7 +145,10 @@ func main() {
 	}
 
 	var component models.Component
-	cstorage := storage.NewMongoStorageClient(storage.NewMongoClient(cfg), cfg.DbName)
+	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, nil)
+	if err != nil {
+		panic(err)
+	}
 
 	switch concrete := any.(type) {
 	case models.ComponentReference:

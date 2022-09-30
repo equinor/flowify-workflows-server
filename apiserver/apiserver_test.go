@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	test_server_port       = 48842
+	test_server_port       = 1234
 	mongo_test_host        = "localhost"
 	mongo_test_port        = 27017
 	test_db_name           = "test"
@@ -30,8 +31,7 @@ type testCase struct {
 	Body       string
 }
 
-func Test_FlowifyServer(t *testing.T) {
-
+func Test_ApiServer(t *testing.T) {
 	server, err := NewFlowifyServer(
 		fake.NewSimpleClientset(),
 		"not-used", /* config namespace for k8s */
@@ -44,11 +44,11 @@ func Test_FlowifyServer(t *testing.T) {
 	require.NoError(t, err)
 
 	/*
-		spin up a complete server
+		spin up a apiserver server with some functionality not connected
 	*/
 
 	ready := make(chan bool, 1)
-	go server.Run(ctx, &ready)
+	go server.Run(context.TODO(), &ready)
 
 	require.True(t, <-ready, "make sure the server started before we continue")
 

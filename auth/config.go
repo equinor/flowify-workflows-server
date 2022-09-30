@@ -17,17 +17,18 @@ type AuthConfig struct {
 	Config map[string]interface{} `mapstructure:"config"`
 }
 
-func ResolveAuthClient(config AuthConfig) (AuthClient, error) {
+type AzureConfig struct {
+	Issuer   string
+	Audience string
+	KeysUrl  string
+}
+
+func NewAuthClientFromConfig(config AuthConfig) (AuthClient, error) {
 
 	switch config.Handler {
 	case "azure-oauth2-openid-token":
 		{
-			var azData struct {
-				Issuer   string
-				Audience string
-				KeysUrl  string
-			}
-
+			var azData AzureConfig
 			err := mapstructure.Decode(config.Config, &azData)
 			if err != nil {
 				return nil, errors.Wrapf(err, "could not decode AuthConfig: %v", config.Config)

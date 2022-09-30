@@ -4,19 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
-	"os/user"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	v1alpha "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned/fake"
 	"github.com/equinor/flowify-workflows-server/apiserver"
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/models"
@@ -24,6 +20,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/storage"
 	fuser "github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -32,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 type e2eTestSuite struct {
@@ -49,36 +44,6 @@ var (
 
 func TestE2ETestSuite(t *testing.T) {
 	suite.Run(t, &e2eTestSuite{})
-}
-
-func getKubeClient() *kubernetes.Clientset {
-	config, err := rest.InClusterConfig()
-
-	if err != nil {
-		env := os.Getenv("KUBECONFIG")
-
-		var path string
-
-		if env == "" {
-			usr, _ := user.Current()
-
-			log.Infof("No service account detected, running locally")
-			path = filepath.Join(usr.HomeDir, ".kube/config")
-		} else {
-			path = env
-		}
-		kubeconfig := flag.String("kubeconfig", path, "kubeconfig file")
-		flag.Parse()
-
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
-
-		if err != nil {
-			log.Errorf("Cannot load kube config: %s", err)
-			panic("Cannot load .kube file")
-		}
-	}
-
-	return kubernetes.NewForConfigOrDie(config)
 }
 
 var mockUser fuser.MockUser = fuser.MockUser{
@@ -115,41 +80,58 @@ data:
 func (s *e2eTestSuite) SetupSuite() {
 	logrus.Info("Setting up e2eTestSuite")
 
+	// use the type together with decoding here
+	var mongoConfig map[string]interface{}
+	mapstructure.Decode(storage.MongoConfig{
+		Address: "localhost",
+		Port:    27017,
+	}, &mongoConfig)
+
+	var azureConfig map[string]interface{}
+	mapstructure.Decode(auth.AzureConfig{
+		Issuer:   "e2etest-runner",
+		Audience: "e2etest",
+	}, &azureConfig)
+
+	// set up config for server
+	cfg := apiserver.Config{
+		DbConfig: storage.DbConfig{
+			DbName: "e2etest",
+			Select: "mongo",
+			Config: mongoConfig,
+		},
+		KubernetesKonfig: apiserver.KubernetesKonfig{
+			Namespace: "test",
+		},
+		AuthConfig: auth.AuthConfig{
+			Handler: "azure-oauth2-openid-token",
+			Config:  azureConfig,
+		},
+		LogConfig:    apiserver.LogConfig{},
+		ServerConfig: apiserver.ServerConfig{},
+	}
+
 	ctx := context.Background()
+
 	s.client = &http.Client{}
 	s.client.Timeout = time.Second * 30
-	s.kubeclient = getKubeClient()
 
-	//kubeclient := fake.NewSimpleClientset()
-
-	wfclient := v1alpha.NewSimpleClientset()
 	//	var nodeStorage storage.ComponentClient = nil /* storage.NewMongoStorageClient(storage.NewMongoClient(), test_db_name) */
 	dbName := "e2etest"
 	os.Setenv("FLOWIFY_MONGO_ADDRESS", "localhost")
 	os.Setenv("FLOWIFY_MONGO_PORT", "27017")
-	m := storage.NewMongoClient()
+	m, _ := storage.NewMongoClientFromConfig(cfg.DbConfig)
+
 	log.Infof("Dropping db %s to make sure we're clean", dbName)
 	m.Database(dbName).Drop(context.TODO())
-	nodeStorage := storage.NewMongoStorageClient(m, dbName)
-
-	var volumeStorage storage.VolumeClient = nil /* storage.NewMongoVolumeClient(storage.NewMongoClient(), test_db_name) */
-	var authc auth.AuthClient = auth.MockAuthenticator{User: mockUser}
 
 	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
-	stdout, _ := cmd.Output()
+	if stdout, err := cmd.Output(); err == nil {
+		apiserver.CommitSHA = strings.TrimSuffix(string(stdout), "\n")
+		apiserver.BuildTime = time.Now().UTC().Format(time.RFC3339)
+	}
 
-	apiserver.CommitSHA = strings.TrimSuffix(string(stdout), "\n")
-	apiserver.BuildTime = time.Now().UTC().Format(time.RFC3339)
-	namespace := "e2etest"
-
-	server, _ := apiserver.NewFlowifyServer(
-		s.kubeclient,
-		wfclient,
-		nodeStorage,
-		volumeStorage,
-		8842,
-		authc,
-	)
+	server, _ := apiserver.NewFlowifyServerFromConfig(cfg)
 
 	ready := make(chan bool, 1)
 
@@ -172,23 +154,23 @@ func (s *e2eTestSuite) SetupSuite() {
 	auth_header = tokenString
 
 	wsName := "test"
-	if _, err := s.kubeclient.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); errors.IsNotFound(err) {
+	if _, err := s.kubeclient.CoreV1().Namespaces().Get(context.TODO(), cfg.KubernetesKonfig.Namespace, metav1.GetOptions{}); errors.IsNotFound(err) {
 		ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
-			Name:      namespace,
-			Namespace: namespace}}
+			Name:      cfg.KubernetesKonfig.Namespace,
+			Namespace: cfg.KubernetesKonfig.Namespace}}
 		ns, err = s.kubeclient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		s.NoError(err)
 	} else {
-		fmt.Println("ns found", namespace)
+		fmt.Println("ns found", cfg.KubernetesKonfig.Namespace)
 	}
 
-	if _, err := s.kubeclient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), wsName, metav1.GetOptions{}); errors.IsNotFound(err) {
+	if _, err := s.kubeclient.CoreV1().ConfigMaps(cfg.KubernetesKonfig.Namespace).Get(context.TODO(), wsName, metav1.GetOptions{}); errors.IsNotFound(err) {
 		ws_test := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 			Name:      wsName,
-			Namespace: namespace,
+			Namespace: cfg.KubernetesKonfig.Namespace,
 			Labels:    map[string]string{"app.kubernetes.io/component": "workspace-config"},
 		}, Data: map[string]string{"roles": "[[\"tester\"]]"}}
-		ws_test, err = s.kubeclient.CoreV1().ConfigMaps(namespace).Create(context.TODO(), ws_test, metav1.CreateOptions{})
+		ws_test, err = s.kubeclient.CoreV1().ConfigMaps(cfg.KubernetesKonfig.Namespace).Create(context.TODO(), ws_test, metav1.CreateOptions{})
 		s.NoError(err)
 	} else {
 		fmt.Println("Ws found", wsName)
