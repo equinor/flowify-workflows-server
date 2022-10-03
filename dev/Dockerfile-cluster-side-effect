@@ -1,0 +1,56 @@
+# syntax=docker/dockerfile:1
+FROM alpine as base
+LABEL description="Flowify cluster environment"
+RUN apk add --no-cache \
+    bash \
+    binutils \
+    curl \
+    docker \
+    openssl \
+    shadow \
+    vim \
+    wget \
+    bash-completion
+
+FROM base as buildbase
+WORKDIR /root
+# Install kubectl
+RUN curl -LO https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl && \
+    chmod +x ./kubectl && \
+    mv ./kubectl /usr/local/bin/kubectl
+# Install Kubernetes in Docker (kind)
+RUN curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.15.0/kind-linux-amd64 && \
+    chmod +x ./kind && \
+    mv ./kind /usr/local/bin/kind
+RUN mkdir -p $GOPATH/src/github.com/equinor/
+# Install argo
+RUN curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.0/argo-linux-amd64.gz && \
+    gunzip argo-linux-amd64.gz && \
+    chmod +x argo-linux-amd64 && \
+    mv ./argo-linux-amd64 /usr/local/bin/argo
+
+# extract bash completion into root bashrc
+RUN argo completion bash > /root/.bashrc
+RUN kubectl completion bash >> /root/.bashrc
+
+COPY <<"EOF" ./start
+/usr/local/bin/kind version 
+/usr/local/bin/kind export --name cluster kubeconfig 
+if [ -f $HOME/.kube/config ];
+then
+  echo Kind cluster exist, getting kubeconfig from cluster 
+else  
+  echo "Bringing up a cluster" 
+  /usr/local/bin/kind create cluster --name cluster
+fi 
+export
+echo Modifying Kubernetes config to point to Kind master node 
+sed -i "s/^    server:.*/    server: https:\/\/$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/" $HOME/.kube/config 
+cat $HOME/.kube/config
+cd 
+kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-workflows/master/manifests/quick-start-postgres.yaml 
+kubectl apply -f $GOPATH/src/github.com/equinor/flowify-workflows-server/dev-config.yaml 
+#tail -f /dev/null
+EOF
+
+ENTRYPOINT ["/bin/bash", "-x", "start"]
