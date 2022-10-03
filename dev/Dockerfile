@@ -2,6 +2,7 @@ FROM golang:1.18-alpine as base
 LABEL description="Flowify dev environment"
 RUN apk add --no-cache \
     bash \
+    bash-completion \
     binutils \
     curl \
     docker \
@@ -26,18 +27,20 @@ RUN curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0
     chmod +x ./kind && \
     mv ./kind /usr/local/bin/kind
 # Install argo
-RUN curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.0/argo-linux-amd64.gz && \
+RUN curl -LO https://github.com/argoproj/argo-workflows/releases/download/v3.4.0/argo-linux-amd64.gz && \
     gunzip argo-linux-amd64.gz && \
     chmod +x argo-linux-amd64 && \
     mv ./argo-linux-amd64 /usr/local/bin/argo
 RUN mkdir -p $GOPATH/src/github.com/equinor/
+RUN echo 'source <(kubectl completion bash)' >>~/.bashrc
+RUN echo 'source <(argo completion bash)' >>~/.bashrc
 WORKDIR $GOPATH/src/github.com/equinor/flowify-workflows-server
-# COPY dev/quick-start-argo.yml .
 COPY dev/cluster_runner.sh .
-COPY dev/dev-config.yaml .
+COPY dev/flowify_server_runner.sh .
 COPY dev/kind.yaml .
 COPY dev/argo-cluster-install/ ./argo-cluster-install
 RUN chmod +x ./cluster_runner.sh
+RUN chmod +x ./flowify_server_runner.sh
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
@@ -52,5 +55,5 @@ COPY Makefile .
 RUN ["/bin/bash", "-c", "make server"]
 # EXPOSE 8842/tcp
 
-ENTRYPOINT ["/bin/bash", "cluster_runner.sh"]
-# ENTRYPOINT ["/bin/bash"]
+# ENTRYPOINT ["/bin/bash", "cluster_runner.sh"]
+ENTRYPOINT ["/bin/bash"]

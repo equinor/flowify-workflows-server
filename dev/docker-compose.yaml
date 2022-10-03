@@ -14,19 +14,44 @@ services:
       interval: 10s
     command: ["--replSet", "rs0", "--bind_ip_all"]
 
-  server:
-    container_name: flowify_server
+  cluster:
+    container_name: kind_cluster
     build:
       context: ../
       dockerfile: dev/Dockerfile
+    image: dev_server
+    command: ["cluster_runner.sh"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      # args:
-        # buildno: 1
     depends_on:
       - mongo
+    environment:
+      - KUBERNETES_SERVICE_HOST=cluster-control-plane
+      - KUBERNETES_SERVICE_PORT=6443
+      - FLOWIFY_MONGO_ADDRESS=mongo_server
+      - FLOWIFY_MONGO_PORT=27017
+      - FLOWIFY_K8S_NAMESPACE=argo
+      - TENANT_ID=sandbox
+      - CLIENT_ID=flowify
+      - JWKS_URI=DISABLE_JWT_SIGNATURE_VERIFICATION
+    healthcheck:
+      test: kubectl rollout status deployments -n argo --timeout=1s || exit 1
+      interval: 30s
+      retries: 5
+      start_period: 20s
+      timeout: 120s
+  
+  server:
+    container_name: flowify_sevrver
+    image: dev_server
+    command: ["flowify_server_runner.sh"]
     ports:
       - "8842:8842"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      cluster:
+        condition: service_healthy
     environment:
       - KUBERNETES_SERVICE_HOST=cluster-control-plane
       - KUBERNETES_SERVICE_PORT=6443

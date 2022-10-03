@@ -13,38 +13,48 @@ cluster_exist=$?
 
 if [ $cluster_exist -eq 0 ]
 then 
+  echo -e ${GREEN}
+  echo =====================================================================
   echo Kind cluster exist, getting kubeconfig from cluster
+  echo =====================================================================
+  echo -e ${NOCOLOR}
 else 
+  echo -e ${BLUE}
+  echo =====================================================================
   echo Bringing up a cluster
+  echo =====================================================================
+  echo -e ${NOCOLOR}
   bash -c '/usr/local/bin/kind create cluster --name cluster --config $GOPATH/src/github.com/equinor/flowify-workflows-server/kind.yaml'
-  # bash -c '/usr/local/bin/kind create cluster --name cluster'
 fi
 
+# Set a trap for SIGTERM signal
+trap "docker rm -f cluster-control-plane" SIGTERM
+
+echo -e ${GREEN}
+echo =====================================================================
 echo Modifying Kubernetes config to point to Kind master node
+echo =====================================================================
+echo -e ${NOCOLOR}
 sed -i "s/^    server:.*/    server: https:\/\/$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/" $HOME/.kube/config
-cd
 
 if [ $cluster_exist -ne 0 ]
 then
   echo -e ${BLUE}
   echo =====================================================================
-  echo Applying argo config
-  echo =====================================================================
-  echo -e ${NOCOLOR}
-  kubectl apply -f $GOPATH/src/github.com/equinor/flowify-workflows-server/dev-config.yaml
-
-  echo -e ${BLUE}
-  echo =====================================================================
   echo Deploying argo
   echo =====================================================================
   echo -e ${NOCOLOR}
-  # kubectl create ns $FLOWIFY_K8S_NAMESPACE
-  # kubectl apply -n $FLOWIFY_K8S_NAMESPACE -f https://raw.githubusercontent.com/argoproj/argo-workflows/master/manifests/quick-start-postgres.yaml
   kubectl apply -k $GOPATH/src/github.com/equinor/flowify-workflows-server/argo-cluster-install
+
+  echo -e ${PURPLE}
+  echo =====================================================================
+  echo "Waiting for deployment..."
+  echo =====================================================================
+  echo -e ${NOCOLOR}
+  kubectl rollout status deployments -n argo
 fi
 
-# echo Setting up Kubectl Proxy
-# CLIENT_IP=$(docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' container-name)
-# kubectl proxy --address=$CLIENT_IP --accept-hosts=^localhost$,^127\.0\.0\.1$,^\[::1\]$ &
-
-bash -c 'FLOWIFY_K8S_NAMESPACE=argo $GOPATH/src/github.com/equinor/flowify-workflows-server/build/flowify-workflows-server --flowify-auth azure-oauth2-openid-token'
+while :
+do
+	sleep 1
+done
