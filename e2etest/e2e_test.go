@@ -7,22 +7,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/equinor/flowify-workflows-server/apiserver"
-	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
-	"github.com/equinor/flowify-workflows-server/storage"
 	fuser "github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
@@ -77,53 +75,67 @@ data:
     roles: "[[\"tester\"]]"
 `
 
+var configString = []byte(`
+db:
+  # select which db to use
+  select: mongo
+  # the flowify document database
+  dbname: e2e-test
+#  mongo:
+  config:
+    # Mongo fields
+    # (FLOWIFY_)DB_CONFIG_ADDRESS=...
+    # url to database
+    address: localhost
+    # port where mongo is listening
+    port: 27017
+
+kubernetes:
+  # how to locate the kubernetes server
+  kubeconfig: SET_FROM_ENV
+  # the namespace containing the flowify configuration and setup
+  namespace: flowify-e2e
+
+auth:
+  handler: azure-oauth2-openid-token
+  config:
+    issuer: e2e-test-runner
+    audience: e2e-test
+#    keysurl: http://localhost:32023/jwkeys/
+    keysurl: SET_FROM_ENV
+
+logging:
+  loglevel: info
+
+server:
+  port: 8443
+`)
+
+var cfg apiserver.Config
+var server_addr string
+
 func (s *e2eTestSuite) SetupSuite() {
 	logrus.Info("Setting up e2eTestSuite")
 
-	// use the type together with decoding here
-	var mongoConfig map[string]interface{}
-	mapstructure.Decode(storage.MongoConfig{
-		Address: "localhost",
-		Port:    27017,
-	}, &mongoConfig)
+	viper.SetConfigType("yaml")
+	viper.AutomaticEnv() // let env override config if available
 
-	var azureConfig map[string]interface{}
-	mapstructure.Decode(auth.AzureConfig{
-		Issuer:   "e2etest-runner",
-		Audience: "e2etest",
-	}, &azureConfig)
+	// to allow environment parse nested config
+	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`))
 
-	// set up config for server
-	cfg := apiserver.Config{
-		DbConfig: storage.DbConfig{
-			DbName: "e2etest",
-			Select: "mongo",
-			Config: mongoConfig,
-		},
-		KubernetesKonfig: apiserver.KubernetesKonfig{
-			Namespace: "test",
-		},
-		AuthConfig: auth.AuthConfig{
-			Handler: "azure-oauth2-openid-token",
-			Config:  azureConfig,
-		},
-		LogConfig:    apiserver.LogConfig{},
-		ServerConfig: apiserver.ServerConfig{},
-	}
+	// prefix all envs for uniqueness
+	viper.SetEnvPrefix("FLOWIFY")
+
+	viper.ReadConfig(bytes.NewBuffer(configString))
+	err := viper.Unmarshal(&cfg)
+	s.NoError(err)
+
+	log.Info(cfg)
 
 	ctx := context.Background()
 
 	s.client = &http.Client{}
 	s.client.Timeout = time.Second * 30
-
-	//	var nodeStorage storage.ComponentClient = nil /* storage.NewMongoStorageClient(storage.NewMongoClient(), test_db_name) */
-	dbName := "e2etest"
-	os.Setenv("FLOWIFY_MONGO_ADDRESS", "localhost")
-	os.Setenv("FLOWIFY_MONGO_PORT", "27017")
-	m, _ := storage.NewMongoClientFromConfig(cfg.DbConfig)
-
-	log.Infof("Dropping db %s to make sure we're clean", dbName)
-	m.Database(dbName).Drop(context.TODO())
 
 	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
 	if stdout, err := cmd.Output(); err == nil {
@@ -131,7 +143,10 @@ func (s *e2eTestSuite) SetupSuite() {
 		apiserver.BuildTime = time.Now().UTC().Format(time.RFC3339)
 	}
 
-	server, _ := apiserver.NewFlowifyServerFromConfig(cfg)
+	server, err := apiserver.NewFlowifyServerFromConfig(cfg)
+	require.NoError(s.T(), err, "cant recover without server")
+
+	s.kubeclient = server.GetKubernetesClient().(*kubernetes.Clientset)
 
 	ready := make(chan bool, 1)
 
@@ -145,15 +160,15 @@ func (s *e2eTestSuite) SetupSuite() {
 		"iat":   time.Now().Unix(),
 		"nbf":   time.Now().Unix(),
 		"exp":   time.Now().Add(time.Minute * 5).Unix(),
-		"aud":   "e2e-test",
-		"iss":   "e2e-test",
+		"aud":   "e2e-test",        //cfg.AuthConfig.Config["audience"].(string),
+		"iss":   "e2e-test-runner", //cfg.AuthConfig.Config["issuer"].(string),
 	})
 	const secretKey = "my_secret_key"
 	tokenString, err := jwtUser.SignedString([]byte(secretKey))
 	require.NoError(s.T(), err)
 	auth_header = tokenString
 
-	wsName := "test"
+	wsName := cfg.KubernetesKonfig.Namespace
 	if _, err := s.kubeclient.CoreV1().Namespaces().Get(context.TODO(), cfg.KubernetesKonfig.Namespace, metav1.GetOptions{}); errors.IsNotFound(err) {
 		ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
 			Name:      cfg.KubernetesKonfig.Namespace,
@@ -178,6 +193,9 @@ func (s *e2eTestSuite) SetupSuite() {
 
 	// make sure we get the ready signal
 	s.Equal(true, <-ready)
+
+	server_addr = "http://" + server.GetAddress()
+
 }
 
 func (s *e2eTestSuite) TearDownSuite() {
@@ -207,7 +225,7 @@ func make_request_with_client(url, method string, payload string, client *http.C
 }
 
 func (s *e2eTestSuite) Test_zpages() {
-	resp, err := http.Get("http://localhost:8842/versionz")
+	resp, err := http.Get(server_addr + "/versionz")
 	require.Nil(s.T(), err)
 
 	s.Equal(http.StatusOK, resp.StatusCode)
@@ -229,22 +247,71 @@ func (s *e2eTestSuite) Test_zpages() {
 }
 
 func (s *e2eTestSuite) Test_Userinfo() {
-	requestor := make_requestor(s.client)
 
-	resp, err := requestor("http://localhost:8842/api/userinfo/", http.MethodGet, "")
-	s.NoError(err)
-	s.Equal(http.StatusOK, resp.StatusCode)
+	type testCase struct {
+		User           fuser.User
+		Name           string
+		Auth           string
+		ExpectedStatus int
+	}
 
-	var user fuser.MockUser
-	err = marshalResponse(resp, &user)
+	jwtUser := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"name":  mockUser.Name,
+		"email": mockUser.Email,
+		"roles": mockUser.Roles,
+		"iat":   time.Now().Unix(),
+		"nbf":   time.Now().Unix(),
+		"exp":   time.Now().Add(time.Minute * 5).Unix(),
+		"aud":   cfg.AuthConfig.Config["audience"].(string),
+		"iss":   cfg.AuthConfig.Config["issuer"].(string),
+	})
+	const secretKey = "my_secret_key"
+	tokenString, err := jwtUser.SignedString([]byte(secretKey))
 	s.NoError(err)
-	s.Equal(mockUser, user)
+
+	testCases := []testCase{
+		{
+			User:           nil,
+			Name:           "No auth",
+			Auth:           "",
+			ExpectedStatus: http.StatusBadRequest},
+		{
+			User:           mockUser,
+			Name:           "JWT-Encoded",
+			Auth:           tokenString,
+			ExpectedStatus: http.StatusOK},
+	}
+
+	for _, test := range testCases {
+		s.T().Run(test.Name, func(t *testing.T) {
+			// prepare request
+			req, _ := http.NewRequest(http.MethodGet, server_addr+"/api/v1/userinfo/", nil)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+test.Auth)
+
+			resp, err := s.client.Do(req)
+			require.NoError(t, err)
+			assert.NotEmpty(t, resp)
+			assert.Equal(t, test.ExpectedStatus, resp.StatusCode)
+
+		})
+	}
+	/*
+	   resp, err := requestor(server_addr+"/api/v1/userinfo/", http.MethodGet, "")
+	   s.NoError(err)
+	   s.Equal(http.StatusOK, resp.StatusCode)
+
+	   var user fuser.MockUser
+	   err = marshalResponse(resp, &user)
+	   s.NoError(err)
+	   s.Equal(mockUser, user)
+	*/
 }
 
 func (s *e2eTestSuite) Test_Workspaces() {
 	requestor := make_requestor(s.client)
 
-	resp, err := requestor("http://localhost:8842/api/v1/workspaces/", http.MethodGet, "")
+	resp, err := requestor(server_addr+"/api/v1/workspaces/", http.MethodGet, "")
 	s.NoError(err)
 	s.Equal(http.StatusOK, resp.StatusCode)
 
@@ -268,7 +335,7 @@ func (s *e2eTestSuite) Test_Roundtrip_Component() {
 		"component": %s
 	}`, cmp1)
 
-	resp, err := requestor("http://localhost:8842/api/v1/components/", http.MethodPost, cmpReq)
+	resp, err := requestor(server_addr+"/api/v1/components/", http.MethodPost, cmpReq)
 	s.NoError(err)
 	require.Equal(s.T(), http.StatusCreated, resp.StatusCode)
 
@@ -276,7 +343,7 @@ func (s *e2eTestSuite) Test_Roundtrip_Component() {
 	err = marshalResponse(resp, &cmpResp)
 	s.NoError(err)
 
-	resp2, err := requestor(fmt.Sprintf("http://localhost:8842/api/v1/components/%s", cmpResp.Metadata.Uid.String()), http.MethodGet, cmpReq)
+	resp2, err := requestor(fmt.Sprintf(server_addr+"/api/v1/components/%s", cmpResp.Metadata.Uid.String()), http.MethodGet, cmpReq)
 	s.NoError(err)
 	require.Equal(s.T(), http.StatusOK, resp2.StatusCode)
 
@@ -297,7 +364,7 @@ func (s *e2eTestSuite) Test_Roundtrip_Workflow() {
 		"workflow": %s
 	}`, data)
 
-	resp, err := requestor("http://localhost:8842/api/v1/workflows/", http.MethodPost, wfReq)
+	resp, err := requestor(server_addr+"/api/v1/workflows/", http.MethodPost, wfReq)
 	s.NoError(err)
 	require.Equal(s.T(), http.StatusCreated, resp.StatusCode)
 
@@ -305,7 +372,7 @@ func (s *e2eTestSuite) Test_Roundtrip_Workflow() {
 	err = marshalResponse(resp, &wfResp)
 	s.NoError(err)
 
-	resp2, err := requestor(fmt.Sprintf("http://localhost:8842/api/v1/workflows/%s", wfResp.Metadata.Uid.String()), http.MethodGet, wfReq)
+	resp2, err := requestor(fmt.Sprintf(server_addr+"/api/v1/workflows/%s", wfResp.Metadata.Uid.String()), http.MethodGet, wfReq)
 	s.NoError(err)
 
 	var wfResp2 models.Workflow

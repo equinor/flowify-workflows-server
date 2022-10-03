@@ -70,6 +70,14 @@ type flowifyServer struct {
 	auth          auth.AuthClient
 }
 
+func (f *flowifyServer) GetKubernetesClient() kubernetes.Interface {
+	return f.k8Client
+}
+
+func (f *flowifyServer) GetAddress() string {
+	return f.HttpServer.Addr
+}
+
 func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
 
 	// Kubernetes config
@@ -101,6 +109,9 @@ func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
 	workspace := workspace.NewWorkspaceClient(kubeClient, cfg.KubernetesKonfig.Namespace)
 
 	authClient, err := auth.NewAuthClientFromConfig(cfg.AuthConfig)
+	if err != nil {
+		return flowifyServer{}, errors.Wrap(err, "could not create auth")
+	}
 
 	return flowifyServer{
 		k8Client:      kubeClient,

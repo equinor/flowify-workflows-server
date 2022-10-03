@@ -104,7 +104,7 @@ func NewMongoClientFromConfig(config DbConfig) (*mongo.Client, error) {
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetDirect(true))
 
 	if err != nil {
-		log.WithFields(log.Fields{"URL": uri}).Fatal("Cannot connect Mongo client")
+		log.WithFields(log.Fields{"URL": uri, "Config": config}).Fatal("Cannot connect Mongo client")
 		return nil, errors.Wrap(err, "could not connect to client")
 	}
 
