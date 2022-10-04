@@ -15,7 +15,6 @@ import (
 
 	"github.com/equinor/flowify-workflows-server/apiserver"
 	"github.com/equinor/flowify-workflows-server/models"
-	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	fuser "github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
@@ -337,23 +336,6 @@ func (s *e2eTestSuite) Test_Userinfo() {
 
 		})
 	}
-}
-
-func (s *e2eTestSuite) Test_Workspaces() {
-	requestor := make_authenticated_requestor(s.client, mockUser)
-
-	resp, err := requestor(server_addr+"/api/v1/workspaces/", http.MethodGet, "")
-	require.NoError(s.T(), err, BodyStringer{resp.Body})
-	require.Equal(s.T(), http.StatusOK, resp.StatusCode, BodyStringer{resp.Body})
-
-	type WorkspaceList struct {
-		Items []workspace.Workspace `json:"items"`
-	}
-	var list WorkspaceList
-	err = marshalResponse(ResponseBodyBytes(resp), &list)
-
-	s.NoError(err)
-	s.NotEmpty(list.Items)
 }
 
 func (s *e2eTestSuite) Test_Roundtrip_Component() {
