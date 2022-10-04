@@ -1,20 +1,12 @@
-FROM golang:1.18-alpine as base
-LABEL description="Flowify dev environment"
+FROM alpine:latest as base
+LABEL description="Flowify cluster environment"
 RUN apk add --no-cache \
     bash \
     bash-completion \
-    binutils \
     curl \
     docker \
-    gcc \
-    git \
-    jq \
-    make \
-    musl-dev \
     openssl \
-    shadow \
-    vim \
-    wget
+    vim
 
 FROM base as buildbase
 WORKDIR /root
@@ -31,29 +23,11 @@ RUN curl -LO https://github.com/argoproj/argo-workflows/releases/download/v3.4.0
     gunzip argo-linux-amd64.gz && \
     chmod +x argo-linux-amd64 && \
     mv ./argo-linux-amd64 /usr/local/bin/argo
-RUN mkdir -p $GOPATH/src/github.com/equinor/
 RUN echo 'source <(kubectl completion bash)' >>~/.bashrc
 RUN echo 'source <(argo completion bash)' >>~/.bashrc
-WORKDIR $GOPATH/src/github.com/equinor/flowify-workflows-server
 COPY dev/cluster_runner.sh .
-COPY dev/flowify_server_runner.sh .
 COPY dev/kind.yaml .
 COPY dev/argo-cluster-install/ ./argo-cluster-install
 RUN chmod +x ./cluster_runner.sh
-RUN chmod +x ./flowify_server_runner.sh
-COPY go.mod .
-COPY go.sum .
-RUN go mod download
-ENV PATH="${PATH}:/root"
 
-FROM buildbase as devserver
-COPY apiserver ./apiserver
-COPY pkg ./pkg
-COPY v2 ./v2
-COPY main.go .
-COPY Makefile .
-RUN ["/bin/bash", "-c", "make server"]
-# EXPOSE 8842/tcp
-
-# ENTRYPOINT ["/bin/bash", "cluster_runner.sh"]
-ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["/bin/bash", "cluster_runner.sh"]

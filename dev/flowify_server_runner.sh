@@ -34,4 +34,4 @@ echo =====================================================================
 echo Deploying flowify server
 echo =====================================================================
 echo -e ${NOCOLOR}
-bash -c 'FLOWIFY_K8S_NAMESPACE=argo $GOPATH/src/github.com/equinor/flowify-workflows-server/build/flowify-workflows-server --flowify-auth azure-oauth2-openid-token'
+bash -c 'FLOWIFY_K8S_NAMESPACE=argo $GOPATH/src/github.com/equinor/flowify-workflows-server/build/flowify-workflows-server'

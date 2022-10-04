@@ -18,9 +18,8 @@ services:
     container_name: kind_cluster
     build:
       context: ../
-      dockerfile: dev/Dockerfile
-    image: dev_server
-    command: ["cluster_runner.sh"]
+      dockerfile: dev/Dockerfile.cluster
+    image: dev_cluster
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -28,23 +27,20 @@ services:
     environment:
       - KUBERNETES_SERVICE_HOST=cluster-control-plane
       - KUBERNETES_SERVICE_PORT=6443
-      - FLOWIFY_MONGO_ADDRESS=mongo_server
-      - FLOWIFY_MONGO_PORT=27017
-      - FLOWIFY_K8S_NAMESPACE=argo
-      - TENANT_ID=sandbox
-      - CLIENT_ID=flowify
-      - JWKS_URI=DISABLE_JWT_SIGNATURE_VERIFICATION
+      # - KEEP_KIND_CLUSTER_ALIVE=true
     healthcheck:
       test: kubectl rollout status deployments -n argo --timeout=1s || exit 1
-      interval: 30s
-      retries: 5
-      start_period: 20s
+      interval: 5s
+      retries: 25
+      start_period: 1s
       timeout: 120s
   
   server:
     container_name: flowify_sevrver
+    build:
+      context: ../
+      dockerfile: dev/Dockerfile.server
     image: dev_server
-    command: ["flowify_server_runner.sh"]
     ports:
       - "8842:8842"
     volumes:
@@ -55,12 +51,23 @@ services:
     environment:
       - KUBERNETES_SERVICE_HOST=cluster-control-plane
       - KUBERNETES_SERVICE_PORT=6443
-      - FLOWIFY_MONGO_ADDRESS=mongo_server
-      - FLOWIFY_MONGO_PORT=27017
-      - FLOWIFY_K8S_NAMESPACE=argo
-      - TENANT_ID=sandbox
-      - CLIENT_ID=flowify
-      - JWKS_URI=DISABLE_JWT_SIGNATURE_VERIFICATION
+      - FLOWIFY_DB_SELECT=mongo
+      - FLOWIFY_DB_CONFIG_ADDRESS=mongo_server
+      - FLOWIFY_DB_CONFIG_PORT=27017
+      - FLOWIFY_SERVER_PORT=8842
+      - FLOWIFY_KUBERNETES_NAMESPACE=argo
+      - FLOWIFY_KUBERNETES_KUBECONFIG=/root/.kube/config
+      - KUBECONFIG=/root/.kube/config
+      - FLOWIFY_AUTH_HANDLER=azure-oauth2-openid-token
+      - FLOWIFY_AUTH_CONFIG_ISSUER=sandbox
+      - FLOWIFY_AUTH_CONFIG_AUDIENCE=flowify
+      - FLOWIFY_AUTH_CONFIG_KEYSURL=DISABLE_JWT_SIGNATURE_VERIFICATION
+    healthcheck:
+      test: curl -sL 127.0.0.1:8842 -o /dev/null || exit 1
+      interval: 5s
+      retries: 5
+      start_period: 1s
+      timeout: 30s
 
 networks:
   default:

@@ -24,11 +24,14 @@ else
   echo Bringing up a cluster
   echo =====================================================================
   echo -e ${NOCOLOR}
-  bash -c '/usr/local/bin/kind create cluster --name cluster --config $GOPATH/src/github.com/equinor/flowify-workflows-server/kind.yaml'
+  bash -c '/usr/local/bin/kind create cluster --name cluster --config /root/kind.yaml'
 fi
 
 # Set a trap for SIGTERM signal
-trap "docker rm -f cluster-control-plane" SIGTERM
+if ! [[ "$KEEP_KIND_CLUSTER_ALIVE" = true ]]
+then
+  trap "docker rm -f cluster-control-plane" SIGTERM
+fi
 
 echo -e ${GREEN}
 echo =====================================================================
@@ -44,7 +47,7 @@ then
   echo Deploying argo
   echo =====================================================================
   echo -e ${NOCOLOR}
-  kubectl apply -k $GOPATH/src/github.com/equinor/flowify-workflows-server/argo-cluster-install
+  kubectl apply -k /root/argo-cluster-install
 
   echo -e ${PURPLE}
   echo =====================================================================
@@ -54,7 +57,4 @@ then
   kubectl rollout status deployments -n argo
 fi
 
-while :
-do
-	sleep 1
-done
+sleep infinity
