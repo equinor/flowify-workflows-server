@@ -1,18 +1,9 @@
 version: "3.7"
 services: 
   mongo:
-    # one node mongoDB replica set for local development
-    container_name: mongo_server
-    image: mongo:5.0
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    # volumes:
-    #   - ./database-rs:/data/db
-    healthcheck:
-      test: test $$(echo "rs.initiate().ok || rs.status().ok" | mongo --quiet) -eq 1
-      interval: 10s
-    command: ["--replSet", "rs0", "--bind_ip_all"]
+    extends:
+      file: docker-compose.yaml
+      service: mongo
 
   cluster:
     container_name: flowify_cluster_side_effect
@@ -21,34 +12,22 @@ services:
       dockerfile: dev/Dockerfile-cluster-side-effect
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      # args:
-        # buildno: 1
-#    depends_on:
-#      - mongo
     environment:
       - KUBERNETES_SERVICE_HOST=cluster-control-plane
       - KUBERNETES_SERVICE_PORT=6443
 
-#  server:
-#    container_name: flowify_server
-#    build:
-#      context: ../
-#      dockerfile: dev/Dockerfile-k8s
-#    volumes:
-#      - /var/run/docker.sock:/var/run/docker.sock
-#      # args:
-#        # buildno: 1
-#    depends_on:
-#      - cluster
-#      - mongo
-#    ports:
-#      - "8842:8842"
-#    environment:
-#      - KUBERNETES_SERVICE_HOST=cluster-control-plane
-#      - KUBERNETES_SERVICE_PORT=6443
-#      - FLOWIFY_MONGO_ADDRESS=mongo_server
-#      - FLOWIFY_MONGO_PORT=27017
-#      - FLOWIFY_K8S_NAMESPACE=sandbox
+  flowify-e2e-runner:
+    container_name: flowify_e2e-runner
+    build:
+      context: ../
+      # Use the parent folder as context and its Dockerfile
+    depends_on:
+      - cluster
+      - mongo
+    environment:
+      - KUBERNETES_SERVICE_HOST=cluster-control-plane
+      - KUBERNETES_SERVICE_PORT=6443
+    command: make e2etests
 
 networks:
   default:

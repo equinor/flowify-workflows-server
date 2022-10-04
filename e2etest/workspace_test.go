@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -23,7 +24,8 @@ func (s *e2eTestSuite) Test_workspaces() {
 	requestor := make_requestor(s.client)
 
 	resp, err := requestor("http://localhost:8842/api/v1/workspaces/", http.MethodGet, "")
-	s.NoError(err)
+	require.NoError(s.T(), err, "no point continue")
+	require.Equal(s.T(), http.StatusOK, resp.StatusCode)
 
 	s.Len(resp.Header["Content-Type"], 1)
 	s.Equal("application/json", resp.Header["Content-Type"][0])
@@ -32,7 +34,7 @@ func (s *e2eTestSuite) Test_workspaces() {
 		Items []workspace.Workspace `json:"items"`
 	}
 	var list WorkspaceList
-	marshalResponse(resp, &list)
+	marshalResponse(ResponseBodyBytes(resp), &list)
 
 	s.Len(list.Items, 2)
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	fuser "github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -24,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -35,16 +37,14 @@ type e2eTestSuite struct {
 	kubeclient *kubernetes.Clientset
 }
 
-var (
-	auth_header = ""
-	url         = "localhost:27017"
-)
-
 func TestE2ETestSuite(t *testing.T) {
-	suite.Run(t, &e2eTestSuite{})
+	suite.Run(t,
+		&e2eTestSuite{
+			client: &http.Client{Timeout: 1 * time.Hour},
+		})
 }
 
-var mockUser fuser.MockUser = fuser.MockUser{
+var mockUser fuser.User = fuser.MockUser{
 	Uid:   "0",
 	Name:  "Auth Disabled",
 	Email: "auth@disabled",
@@ -114,6 +114,24 @@ server:
 var cfg apiserver.Config
 var server_addr string
 
+func make_authentication_header(usr fuser.User, secret string) (string, error) {
+	jwtUser := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"name":  usr.GetName(),
+		"email": usr.GetEmail(),
+		"roles": usr.GetRoles(),
+		"iat":   time.Now().Unix(),
+		"nbf":   time.Now().Unix(),
+		"exp":   time.Now().Add(time.Minute * 5).Unix(),
+		"aud":   "e2e-test",        //cfg.AuthConfig.Config["audience"].(string),
+		"iss":   "e2e-test-runner", //cfg.AuthConfig.Config["issuer"].(string),
+	})
+	tokenString, err := jwtUser.SignedString([]byte(secret))
+	if err != nil {
+		return "", errors.Wrap(err, "could not make authentication string")
+	}
+	return "Bearer " + tokenString, nil
+}
+
 func (s *e2eTestSuite) SetupSuite() {
 	logrus.Info("Setting up e2eTestSuite")
 
@@ -152,24 +170,8 @@ func (s *e2eTestSuite) SetupSuite() {
 
 	go server.Run(ctx, &ready)
 
-	mockUser := fuser.MockUser{Uid: "nonce", Name: "John Doe", Email: "user@test.com", Roles: []fuser.Role{"role-x", "role-y"}}
-	jwtUser := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"name":  mockUser.Name,
-		"email": mockUser.Email,
-		"roles": mockUser.Roles,
-		"iat":   time.Now().Unix(),
-		"nbf":   time.Now().Unix(),
-		"exp":   time.Now().Add(time.Minute * 5).Unix(),
-		"aud":   "e2e-test",        //cfg.AuthConfig.Config["audience"].(string),
-		"iss":   "e2e-test-runner", //cfg.AuthConfig.Config["issuer"].(string),
-	})
-	const secretKey = "my_secret_key"
-	tokenString, err := jwtUser.SignedString([]byte(secretKey))
-	require.NoError(s.T(), err)
-	auth_header = tokenString
-
 	wsName := cfg.KubernetesKonfig.Namespace
-	if _, err := s.kubeclient.CoreV1().Namespaces().Get(context.TODO(), cfg.KubernetesKonfig.Namespace, metav1.GetOptions{}); errors.IsNotFound(err) {
+	if _, err := s.kubeclient.CoreV1().Namespaces().Get(context.TODO(), cfg.KubernetesKonfig.Namespace, metav1.GetOptions{}); k8serrors.IsNotFound(err) {
 		ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
 			Name:      cfg.KubernetesKonfig.Namespace,
 			Namespace: cfg.KubernetesKonfig.Namespace}}
@@ -179,7 +181,7 @@ func (s *e2eTestSuite) SetupSuite() {
 		fmt.Println("ns found", cfg.KubernetesKonfig.Namespace)
 	}
 
-	if _, err := s.kubeclient.CoreV1().ConfigMaps(cfg.KubernetesKonfig.Namespace).Get(context.TODO(), wsName, metav1.GetOptions{}); errors.IsNotFound(err) {
+	if _, err := s.kubeclient.CoreV1().ConfigMaps(cfg.KubernetesKonfig.Namespace).Get(context.TODO(), wsName, metav1.GetOptions{}); k8serrors.IsNotFound(err) {
 		ws_test := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 			Name:      wsName,
 			Namespace: cfg.KubernetesKonfig.Namespace,
@@ -212,15 +214,54 @@ func make_requestor(client *http.Client) func(string, string, string) (*http.Res
 	}
 }
 
+func make_authenticated_requestor(client *http.Client, usr fuser.User) func(string, string, string) (*http.Response, error) {
+	if usr == nil {
+		usr = mockUser
+	}
+
+	// inject auth user
+	jwtUser := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"name":  usr.GetName(),
+		"email": usr.GetEmail(),
+		"roles": usr.GetRoles(),
+		"iat":   time.Now().Unix(),
+		"nbf":   time.Now().Unix(),
+		"exp":   time.Now().Add(time.Minute * 5).Unix(),
+		"aud":   cfg.AuthConfig.Config["audience"].(string),
+		"iss":   cfg.AuthConfig.Config["issuer"].(string),
+	})
+	const secretKey = "my_secret_key"
+	tokenString, err := jwtUser.SignedString([]byte(secretKey))
+	if err != nil {
+		panic("unexpected")
+	}
+	auth_header := "Bearer " + tokenString
+
+	return func(url, method string, payload string) (*http.Response, error) {
+		return make_authenticated_request_with_client(url, method, payload, auth_header, client)
+	}
+}
+
 type nameList struct {
 	Names []string `json:"names"`
+}
+
+func make_authenticated_request_with_client(url, method string, payload string, auth_header string, client *http.Client) (*http.Response, error) {
+	req, _ := http.NewRequest(method, url, strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", auth_header)
+	return client.Do(req)
 }
 
 func make_request_with_client(url, method string, payload string, client *http.Client) (*http.Response, error) {
 	req, _ := http.NewRequest(method, url, strings.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", auth_header)
-
+	auth, err := make_authentication_header(mockUser, "my_secret")
+	if err != nil {
+		logrus.Error("could not create auth")
+		return nil, errors.Wrap(err, "could not create request")
+	}
+	req.Header.Set("Authorization", auth)
 	return client.Do(req)
 }
 
@@ -256,9 +297,9 @@ func (s *e2eTestSuite) Test_Userinfo() {
 	}
 
 	jwtUser := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"name":  mockUser.Name,
-		"email": mockUser.Email,
-		"roles": mockUser.Roles,
+		"name":  mockUser.GetName(),
+		"email": mockUser.GetEmail(),
+		"roles": mockUser.GetRoles(),
 		"iat":   time.Now().Unix(),
 		"nbf":   time.Now().Unix(),
 		"exp":   time.Now().Add(time.Minute * 5).Unix(),
@@ -296,39 +337,31 @@ func (s *e2eTestSuite) Test_Userinfo() {
 
 		})
 	}
-	/*
-	   resp, err := requestor(server_addr+"/api/v1/userinfo/", http.MethodGet, "")
-	   s.NoError(err)
-	   s.Equal(http.StatusOK, resp.StatusCode)
-
-	   var user fuser.MockUser
-	   err = marshalResponse(resp, &user)
-	   s.NoError(err)
-	   s.Equal(mockUser, user)
-	*/
 }
 
 func (s *e2eTestSuite) Test_Workspaces() {
-	requestor := make_requestor(s.client)
+	requestor := make_authenticated_requestor(s.client, mockUser)
 
 	resp, err := requestor(server_addr+"/api/v1/workspaces/", http.MethodGet, "")
-	s.NoError(err)
-	s.Equal(http.StatusOK, resp.StatusCode)
+	require.NoError(s.T(), err, BodyStringer{resp.Body})
+	require.Equal(s.T(), http.StatusOK, resp.StatusCode, BodyStringer{resp.Body})
 
 	type WorkspaceList struct {
 		Items []workspace.Workspace `json:"items"`
 	}
 	var list WorkspaceList
-	err = marshalResponse(resp, &list)
+	err = marshalResponse(ResponseBodyBytes(resp), &list)
 
 	s.NoError(err)
 	s.NotEmpty(list.Items)
 }
 
 func (s *e2eTestSuite) Test_Roundtrip_Component() {
-	requestor := make_requestor(s.client)
 
-	cmp1, _ := ioutil.ReadFile("../v1/models/examples/minimal-any-component.json")
+	requestor := make_authenticated_requestor(s.client, mockUser)
+
+	cmp1, err := ioutil.ReadFile("../models/examples/minimal-any-component.json")
+	s.NoError(err)
 	cmpReq := fmt.Sprintf(`
 	{
 		"options": {},
@@ -336,11 +369,11 @@ func (s *e2eTestSuite) Test_Roundtrip_Component() {
 	}`, cmp1)
 
 	resp, err := requestor(server_addr+"/api/v1/components/", http.MethodPost, cmpReq)
-	s.NoError(err)
+	require.NoError(s.T(), err)
 	require.Equal(s.T(), http.StatusCreated, resp.StatusCode)
 
 	var cmpResp models.Component
-	err = marshalResponse(resp, &cmpResp)
+	err = marshalResponse(ResponseBodyBytes(resp), &cmpResp)
 	s.NoError(err)
 
 	resp2, err := requestor(fmt.Sprintf(server_addr+"/api/v1/components/%s", cmpResp.Metadata.Uid.String()), http.MethodGet, cmpReq)
@@ -348,16 +381,16 @@ func (s *e2eTestSuite) Test_Roundtrip_Component() {
 	require.Equal(s.T(), http.StatusOK, resp2.StatusCode)
 
 	var cmpResp2 models.Component
-	err = marshalResponse(resp2, &cmpResp2)
+	err = marshalResponse(ResponseBodyBytes(resp2), &cmpResp2)
 	s.NoError(err)
 	s.Equal(cmpResp, cmpResp2, "expect roundtrip equality")
 
 }
 
 func (s *e2eTestSuite) Test_Roundtrip_Workflow() {
-	requestor := make_requestor(s.client)
+	requestor := make_authenticated_requestor(s.client, mockUser)
 
-	data, _ := ioutil.ReadFile("../v1/models/examples/minimal-any-workflow.json")
+	data, _ := ioutil.ReadFile("../models/examples/minimal-any-workflow.json")
 	wfReq := fmt.Sprintf(`
 	{
 		"options": {},
@@ -369,199 +402,75 @@ func (s *e2eTestSuite) Test_Roundtrip_Workflow() {
 	require.Equal(s.T(), http.StatusCreated, resp.StatusCode)
 
 	var wfResp models.Workflow
-	err = marshalResponse(resp, &wfResp)
+	err = marshalResponse(ResponseBodyBytes(resp), &wfResp)
 	s.NoError(err)
 
 	resp2, err := requestor(fmt.Sprintf(server_addr+"/api/v1/workflows/%s", wfResp.Metadata.Uid.String()), http.MethodGet, wfReq)
 	s.NoError(err)
 
 	var wfResp2 models.Workflow
-	err = marshalResponse(resp2, &wfResp2)
+	err = marshalResponse(ResponseBodyBytes(resp2), &wfResp2)
 	s.NoError(err)
 	s.Equal(wfResp, wfResp2, "expect roundtrip equality")
 
 }
 
-/*
-	func (s *e2eTestSuite) Test_Roundtrip_live_system() {
-		requestor := make_requestor(s.client)
+type BodyStringer struct {
+	rc io.ReadCloser
+}
 
-		var pp [7]string
-		pp[0] = wf1
-		pp[1] = wf2
-		pp[2] = wf3
-
-		for i := 0; i < 3; i++ {
-			resp, err := requestor("http://localhost:8842/api/v1/workflows/test", http.MethodPost, pp[i])
-			s.NoError(err)
-
-			if err != nil {
-				s.T().Fatalf("Error reaching the flowify server: %v", err)
-			}
-
-			s.Equal(http.StatusOK, resp.StatusCode)
-		}
-
-		{
-			type TestResponse struct {
-				name     string
-				response int
-			}
-
-			wf_list := []TestResponse{{"hello-world-b6h5m", http.StatusOK}, {"hello-world-9tql2-test", http.StatusOK}, {"hello-world-b6h5m-test", http.StatusOK}, {"hello-missing-workflow", http.StatusNotFound}}
-
-			for _, testcase := range wf_list {
-				resp, err := requestor("http://localhost:8842/api/v1/workflows/test/"+testcase.name, http.MethodGet, "")
-				s.Equal(testcase.response, resp.StatusCode)
-				s.NoError(err)
-			}
-		}
-		resp, err := requestor("http://localhost:8842/api/v1/workflows/test/hello-world-9tql2-test", http.MethodDelete, "")
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflow-templates/test", http.MethodPost, wft1)
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test/submit", http.MethodPost, `{"resourceKind": "WorkflowTemplate", "ResourceName": "wft1"}`)
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		buf_subm := new(bytes.Buffer)
-		buf_subm.ReadFrom(resp.Body)
-
-		var wf_subm wfv1.Workflow
-		err = json.Unmarshal(buf_subm.Bytes(), &wf_subm)
-		name_submitted := wf_subm.ObjectMeta.Name
-
-		time.Sleep(3 * time.Second)
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test/"+name_submitted+"/log?logOptions.container=main&logOptions.follow=true&logOptions.podName="+name_submitted,
-			http.MethodGet, "")
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-		s.Equal("text/event-stream", resp.Header.Get("Content-Type"))
-
-		buf_log := new(bytes.Buffer)
-
-		// wait for up to 10s for the stream to deliver any body data
-		for i := 0; i < 10; i++ {
-			numRead, err := buf_log.ReadFrom(resp.Body)
-
-			s.NoError(err)
-
-			if numRead > 6 {
-				break
-			}
-			time.Sleep(1 * time.Second)
-		}
-
-		buf_log.Next(6) // remove data prefix
-		var objmap map[string]json.RawMessage
-
-		err = json.Unmarshal(buf_log.Bytes(), &objmap)
-		s.NoError(err)
-
-		var entry wf.LogEntry
-		s.NoError(json.Unmarshal(objmap["result"], &entry))
-		s.Equal("hello world", entry.Content)
-
-		var struk wfv1.WorkflowList
-		{
-			resp, err = requestor("http://localhost:8842/api/v1/workflows/test", http.MethodGet, "") // should be {wf1, wf3, wft}
-
-			buf := new(bytes.Buffer)
-			buf.ReadFrom(resp.Body)
-
-			err = json.Unmarshal(buf.Bytes(), &struk)
-
-			s.Equal(3, len(struk.Items))
-		}
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflow-events/test", http.MethodGet, "")
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-		s.NotNil(resp.Body)
-
-		s.Equal("text/event-stream", resp.Header.Get("Content-Type"))
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test/"+name_submitted, http.MethodDelete, "")
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflow-templates/test/wft1", http.MethodDelete, "")
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test", http.MethodPost, wf4) // wf4
-		s.NoError(err)
-
-		// Post in wrong namespace
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test-no-access", http.MethodPost, wf1)
-		s.NoError(err)
-		s.Equal(http.StatusForbidden, resp.StatusCode)
-
-		// Post in notexisting namespace
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test-does-not-exist", http.MethodPost, wf2)
-		s.NoError(err)
-		s.Equal(http.StatusNotFound, resp.StatusCode)
-
-		// --- Test creating without owner label -----------------------------------
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test", http.MethodPost, wf6) // wf 7 (use no owner)
-		s.NoError(err)
-		s.Equal(http.StatusBadRequest, resp.StatusCode)
-
-		// --- Check if content is still as expected -------------------------------
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test", http.MethodGet, "") // should be 3 {wf1, wf3, wf4}
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		buf3 := new(bytes.Buffer)
-		buf3.ReadFrom(resp.Body)
-		json.Unmarshal(buf3.Bytes(), &struk)
-		s.Equal(3, len(struk.Items))
-
-		// --- Delete all resources, test delete of already removed resources-------
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test/hello-world-b6h5m-test", http.MethodDelete, "")
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test/hello-world-9tql2-test", http.MethodDelete, "")
-		s.NoError(err)
-		s.Equal(http.StatusNotFound, resp.StatusCode)
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test/hello-world-b6h5m", http.MethodDelete, "")
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test/hello-world-b6h5m", http.MethodDelete, "")
-		s.NoError(err)
-		s.Equal(http.StatusNotFound, resp.StatusCode)
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test/wf4", http.MethodDelete, "")
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		// --- In the end there should be no workflows left ------------------------
-
-		resp, err = requestor("http://localhost:8842/api/v1/workflows/test", http.MethodGet, "") // should be {}
-		s.NoError(err)
-		s.Equal(http.StatusOK, resp.StatusCode)
-
-		var struk2 wfv1.WorkflowList
-		buf4 := new(bytes.Buffer)
-		buf4.ReadFrom(resp.Body)
-		json.Unmarshal(buf4.Bytes(), &struk2)
-		s.Equal(0, len(struk2.Items))
+// bodystringer doesn't consume the response body until actually
+// trying to print the output.
+// It is useful to put in test-debug constructs:
+//
+//	resp, err := req...
+//	s.NoError(err, BodyStringer{resp.Body})
+//	s.Equal(ExpectedCode, resp.StatusCode, BodyStringer{resp.Body})
+func (d BodyStringer) String() string {
+	return string(d.Bytes())
+}
+func (d BodyStringer) Bytes() []byte {
+	buf := new(bytes.Buffer)
+	defer d.rc.Close()
+	if _, err := buf.ReadFrom(d.rc); err != nil {
+		return []byte("Error: " + err.Error())
 	}
-*/
-func marshalResponse(resp *http.Response, obj any) error {
-	buffer := new(bytes.Buffer)
-	buffer.ReadFrom(resp.Body)
-	logrus.Info("Buffer: ", buffer)
-	return json.Unmarshal(buffer.Bytes(), obj)
+	return buf.Bytes()
+}
+
+func ResponseBodyBytes(resp *http.Response) []byte {
+	return BodyStringer{resp.Body}.Bytes()
+}
+
+func (s *e2eTestSuite) Test_Roundtrip_Job() {
+	requestor := make_authenticated_requestor(s.client, mockUser)
+
+	data, _ := ioutil.ReadFile("../models/examples/job-example.json")
+	wfReq := fmt.Sprintf(`
+	{
+		"options": {},
+		"job": %s
+	}`, data)
+
+	resp, err := requestor(server_addr+"/api/v1/jobs/", http.MethodPost, wfReq)
+	s.NoError(err, BodyStringer{resp.Body})
+
+	require.Equal(s.T(), http.StatusCreated, resp.StatusCode, BodyStringer{resp.Body})
+
+	var wfResp models.Job
+	err = marshalResponse(ResponseBodyBytes(resp), &wfResp)
+	s.NoError(err)
+
+	resp2, err := requestor(fmt.Sprintf(server_addr+"/api/v1/jobs/%s", wfResp.Metadata.Uid.String()), http.MethodGet, wfReq)
+	s.NoError(err)
+
+	var wfResp2 models.Workflow
+	err = marshalResponse(ResponseBodyBytes(resp2), &wfResp2)
+	s.NoError(err)
+	s.Equal(wfResp, wfResp2, "expect roundtrip equality")
+}
+
+func marshalResponse(data []byte, obj any) error {
+	//logrus.Info("Marshal data: ", data)
+	return json.Unmarshal(data, obj)
 }

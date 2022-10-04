@@ -100,7 +100,7 @@ func WriteErrorResponse(w http.ResponseWriter, apierr APIError, tag string) {
 func RegisterRoutes(r *mux.Route, componentClient storage.ComponentClient, volumeClient storage.VolumeClient, argoclient argoclient.Interface, k8sclient kubernetes.Interface, sec auth.AuthClient, wsclient workspace.WorkspaceClient) {
 	subrouter := r.Subrouter()
 
-	// require authenticated context (with TokenClaims values `GetTokenClaims`)
+	// require authenticated context
 	subrouter.Use(NewAuthenticationMiddleware(sec))
 	subrouter.Use(NewAuthorizationContext(wsclient))
 

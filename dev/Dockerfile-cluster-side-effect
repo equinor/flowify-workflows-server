@@ -33,6 +33,8 @@ RUN curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.
 RUN argo completion bash > /root/.bashrc
 RUN kubectl completion bash >> /root/.bashrc
 
+COPY dev/dev-config.yaml .
+
 COPY <<"EOF" ./start
 /usr/local/bin/kind version 
 /usr/local/bin/kind export --name cluster kubeconfig 
@@ -49,7 +51,8 @@ sed -i "s/^    server:.*/    server: https:\/\/$KUBERNETES_SERVICE_HOST:$KUBERNE
 cat $HOME/.kube/config
 cd 
 kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-workflows/master/manifests/quick-start-postgres.yaml 
-kubectl apply -f $GOPATH/src/github.com/equinor/flowify-workflows-server/dev-config.yaml 
+kubectl apply -f dev-config.yaml
+echo "We're done here. Goodbye"
 #tail -f /dev/null
 EOF
 
