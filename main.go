@@ -5,11 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"reflect"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	wfclientset "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
+	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"k8s.io/client-go/kubernetes"
@@ -74,7 +77,27 @@ func LoadConfig(path string) (config Config, err error) {
 		}
 	*/
 
-	err = viper.Unmarshal(&config)
+	f := viper.DecodeHook(
+		mapstructure.ComposeDecodeHookFunc(
+			// Try to silent convert string to int
+			// Port env var can be set as the string, not as required int
+			func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+				if f.Kind() != reflect.String {
+					return data, nil
+				}
+				if t.Kind() != reflect.Interface {
+					return data, nil
+				}
+				v, err := strconv.Atoi(data.(string))
+				if err != nil {
+					return data, nil
+				}
+				return v, nil
+			},
+		),
+	)
+
+	err = viper.Unmarshal(&config, f)
 	return
 }
 

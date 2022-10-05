@@ -1,0 +1,76 @@
+version: "3.7"
+services: 
+  mongo:
+    # one node mongoDB replica set for local development
+    container_name: mongo_server
+    image: mongo:5.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    # volumes:
+    #   - ./database-rs:/data/db
+    healthcheck:
+      test: test $$(echo "rs.initiate().ok || rs.status().ok" | mongo --quiet) -eq 1
+      interval: 10s
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+
+  cluster:
+    container_name: kind_cluster
+    build:
+      context: ../
+      dockerfile: dev/Dockerfile.cluster
+    image: dev_cluster
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - mongo
+    environment:
+      - KUBERNETES_SERVICE_HOST=cluster-control-plane
+      - KUBERNETES_SERVICE_PORT=6443
+      # - KEEP_KIND_CLUSTER_ALIVE=true
+    healthcheck:
+      test: kubectl rollout status deployments -n argo --timeout=1s || exit 1
+      interval: 5s
+      retries: 25
+      start_period: 1s
+      timeout: 120s
+  
+  server:
+    container_name: flowify_sevrver
+    build:
+      context: ../
+      dockerfile: dev/Dockerfile.server
+    image: dev_server
+    ports:
+      - "8842:8842"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      cluster:
+        condition: service_healthy
+    environment:
+      - KUBERNETES_SERVICE_HOST=cluster-control-plane
+      - KUBERNETES_SERVICE_PORT=6443
+      - FLOWIFY_DB_SELECT=mongo
+      - FLOWIFY_DB_CONFIG_ADDRESS=mongo_server
+      - FLOWIFY_DB_CONFIG_PORT=27017
+      - FLOWIFY_SERVER_PORT=8842
+      - FLOWIFY_KUBERNETES_NAMESPACE=argo
+      - FLOWIFY_KUBERNETES_KUBECONFIG=/root/.kube/config
+      - KUBECONFIG=/root/.kube/config
+      - FLOWIFY_AUTH_HANDLER=azure-oauth2-openid-token
+      - FLOWIFY_AUTH_CONFIG_ISSUER=sandbox
+      - FLOWIFY_AUTH_CONFIG_AUDIENCE=flowify
+      - FLOWIFY_AUTH_CONFIG_KEYSURL=DISABLE_JWT_SIGNATURE_VERIFICATION
+    healthcheck:
+      test: curl -sL 127.0.0.1:8842 -o /dev/null || exit 1
+      interval: 5s
+      retries: 5
+      start_period: 1s
+      timeout: 30s
+
+networks:
+  default:
+    name: kind
+    external: false
+    driver: bridge
