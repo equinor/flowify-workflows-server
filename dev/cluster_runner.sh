@@ -57,4 +57,7 @@ then
   kubectl rollout status deployments -n argo
 fi
 
-sleep infinity
+while true
+do
+	sleep 1
+done
