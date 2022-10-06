@@ -46,4 +46,4 @@ COPY e2etest ./e2etest
 RUN ["/bin/bash", "-c", "make server"]
 
 #ENTRYPOINT ["/bin/bash"]
-CMD ["./flowify-server-runner"]
+CMD ["./flowify_server_runner.sh"]

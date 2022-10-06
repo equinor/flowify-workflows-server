@@ -37,7 +37,7 @@ var CommitSHA = "unknown"
 var BuildTime = "unknown"
 
 type KubernetesKonfig struct {
-	KubeConfig string `mapstructure:"kubeconfig"`
+	KubeConfigPath string `mapstructure:"kubeconfigpath"`
 	Namespace  string `mapstructure:"namespace"`
 }
 

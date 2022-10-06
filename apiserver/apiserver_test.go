@@ -61,7 +61,7 @@ func Test_ApiServer(t *testing.T) {
 	for _, test := range testcases {
 		t.Run(test.Name, func(t *testing.T) {
 			endpoint := fmt.Sprintf("http://localhost:%d/%s", test_server_port, test.URL)
-			fmt.Println("URL ", endpoint)
+			log.Debugf("URL ", endpoint)
 			resp, err := http.Get(endpoint)
 			require.NoError(t, err)
 			require.NotNil(t, resp)
