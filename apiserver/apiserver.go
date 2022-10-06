@@ -38,7 +38,7 @@ var BuildTime = "unknown"
 
 type KubernetesKonfig struct {
 	KubeConfigPath string `mapstructure:"kubeconfigpath"`
-	Namespace  string `mapstructure:"namespace"`
+	Namespace      string `mapstructure:"namespace"`
 }
 
 type LogConfig struct {
@@ -85,10 +85,10 @@ func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
 	if err != nil {
 		log.Infof("No service account detected, running locally")
 
-		k8sConfig, err = clientcmd.BuildConfigFromFlags("", cfg.KubernetesKonfig.KubeConfig)
+		k8sConfig, err = clientcmd.BuildConfigFromFlags("", cfg.KubernetesKonfig.KubeConfigPath)
 
 		if err != nil {
-			log.Errorf("Cannot load .kube/config from %v: %v", cfg.KubernetesKonfig.KubeConfig, err)
+			log.Errorf("Cannot load .kube/config from %v: %v", cfg.KubernetesKonfig.KubeConfigPath, err)
 			return flowifyServer{}, errors.Wrap(err, "could not create ApiServer from config")
 		}
 	}

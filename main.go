@@ -127,7 +127,7 @@ func main() {
 		cfg.DbConfig.DbName = *dbName
 	}
 	if isFlagPassed("kubeconfig") {
-		cfg.KubernetesKonfig.KubeConfig = *kubeconfig
+		cfg.KubernetesKonfig.KubeConfigPath = *kubeconfig
 	}
 	if isFlagPassed("namespace") {
 		cfg.KubernetesKonfig.Namespace = *k8sConfigNamespace
