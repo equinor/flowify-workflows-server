@@ -1,7 +1,7 @@
 version: "3.7"
 # This test runner needs to be merged with the docker-compose defining the cluster and mongo services
 # Usage: docker-compose -f docker-compose.yaml -f docker-compose-e2e.yaml ... 
-services: 
+services:
   flowify-e2e-runner:
     container_name: flowify_e2e-runner
     build:
@@ -10,8 +10,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - cluster
-      - mongo
+      cluster:
+        condition: service_healthy
+      mongo:
     environment:
       - KUBERNETES_SERVICE_HOST=cluster-control-plane
       - KUBERNETES_SERVICE_PORT=6443
