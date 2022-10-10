@@ -27,7 +27,7 @@ services:
     environment:
       - KUBERNETES_SERVICE_HOST=cluster-control-plane
       - KUBERNETES_SERVICE_PORT=6443
-      - KEEP_KIND_CLUSTER_ALIVE=flase
+      - KEEP_KIND_CLUSTER_ALIVE=false
     healthcheck:
       test: kubectl rollout status deployments -n argo --timeout=1s || exit 1
       interval: 5s
