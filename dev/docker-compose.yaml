@@ -27,7 +27,7 @@ services:
     environment:
       - KUBERNETES_SERVICE_HOST=cluster-control-plane
       - KUBERNETES_SERVICE_PORT=6443
-      # - KEEP_KIND_CLUSTER_ALIVE=true
+      - KEEP_KIND_CLUSTER_ALIVE=flase
     healthcheck:
       test: kubectl rollout status deployments -n argo --timeout=1s || exit 1
       interval: 5s
@@ -36,7 +36,7 @@ services:
       timeout: 120s
   
   server:
-    container_name: flowify_sevrver
+    container_name: flowify_server
     build:
       context: ../
       dockerfile: dev/Dockerfile.server
