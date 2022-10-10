@@ -1,0 +1,43 @@
+name: build dev environment images
+on:
+  workflow_dispatch: {}
+  push:
+    branches: 
+      - main
+    paths:
+      - 'dev/**'
+permissions:
+      id-token: write
+      contents: read
+      packages: write
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Checkout branch
+      uses: actions/checkout@v1
+
+    - name: Set image tag and short sha
+      run: |
+        echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+    - name: GitHub Container Registry login
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Initialize BuildX
+      uses: docker/setup-buildx-action@v1
+
+    - name: Build and push docker image
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: /dev/Dockerfile.cluster
+        push: true
+        tags: |
+          ghcr.io/equinor/flowify-dev-cluster:${{ env.SHORT_SHA}} 
+          ghcr.io/equinor/flowify-dev-cluster:latest
