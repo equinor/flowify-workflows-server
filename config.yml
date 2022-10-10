@@ -44,5 +44,5 @@ logging:
   loglevel: info
 
 server:
-  port: 8443
+  port: 8842
 
