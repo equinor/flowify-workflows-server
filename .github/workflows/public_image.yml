@@ -1,13 +1,9 @@
 name: Build public docker images to ghcr  
  
 on: 
-  workflow_dispatch:
-  push:
-    paths-ignore:
-      - ".github/**"
-    tags: '*'
-    branches:
-      - main
+  release:
+    types: [published]
+
 permissions:
       id-token: write
       contents: read
@@ -19,12 +15,6 @@ jobs:
     steps:
     - name: Checkout branch
       uses: actions/checkout@v1
-      with: 
-          ref: main
-
-    - name: Set image tag and short sha
-      run: |
-        echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
     - name: GitHub Container Registry login
       uses: docker/login-action@v1
@@ -42,5 +32,5 @@ jobs:
         context: .
         push: true
         tags: |
-          ghcr.io/equinor/flowify-workflows-server:${{ env.SHORT_SHA}} 
+          ghcr.io/equinor/flowify-workflows-server:${{ github.event.release.tag_name }}
           ghcr.io/equinor/flowify-workflows-server:latest
