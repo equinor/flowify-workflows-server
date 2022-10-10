@@ -96,10 +96,20 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
 		panic("") // no return
 	}
 
-	go func() { fs.HttpServer.Serve(conn) }()
+	go func() {
+		err := fs.HttpServer.Serve(conn)
+		switch err {
+		case http.ErrServerClosed:
+			log.Info("Server shutdown: ", err)
+		default:
+			log.Info("Server goroutine error: ", err)
+		}
+	}()
 	log.WithFields(log.Fields{"version": CommitSHA, "port": address}).Info("✨ Flowify server started successfully ✨")
 
 	if readyNotifier != nil {
+		log.Info("Notify 'ready' channel")
+
 		// signal successful startup
 		*readyNotifier <- true
 
@@ -112,7 +122,8 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
 	signal.Notify(c, syscall.SIGTERM)
 
 	// Block until we receive SIGTERM.
-	<-c
+	s := <-c
+	log.Info("Signal: ", s)
 }
 
 func logHTTPRequest(r *http.Request, start time.Time, ignoreList []string) {

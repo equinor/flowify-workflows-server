@@ -179,10 +179,10 @@ func (w *workspaceImpl) Update() {
 
 	roleDescCM, err := w.cmInformer.Lister().ConfigMaps(w.namespace).Get(roleDescriptionConfigMapName)
 	if err != nil && k8serrors.IsNotFound(err) {
-		logrus.Warn("configmap (role-description) update", err)
+		logrus.Warnf("role descriptions configmap (%s:%s) not found", w.namespace, roleDescriptionConfigMapName)
 		// not a hard error to not have the descriptions cm
 	} else if err != nil {
-		logrus.Warn("configmap (role-description) update failed", err)
+		logrus.Warnf("role descriptions configmap (%s:%s) update failed: %v", w.namespace, roleDescriptionConfigMapName, err)
 		return
 	}
 
