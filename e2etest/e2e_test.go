@@ -9,8 +9,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
-	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -19,11 +17,9 @@ import (
 	"github.com/equinor/flowify-workflows-server/models"
 	fuser "github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -137,37 +133,8 @@ func make_authentication_header(usr fuser.User, secret string) (string, error) {
 func (s *e2eTestSuite) SetupSuite() {
 	logrus.Info("Setting up e2eTestSuite")
 
-	viper.SetConfigType("yaml")
-	viper.AutomaticEnv() // let env override config if available
-
-	// to allow environment parse nested config
-	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`))
-
-	// prefix all envs for uniqueness
-	viper.SetEnvPrefix("FLOWIFY")
-
-	viper.ReadConfig(bytes.NewBuffer(configString))
-	f := viper.DecodeHook(
-		mapstructure.ComposeDecodeHookFunc(
-			// Try to silent convert string to int
-			// Port env var can be set as the string, not as required int
-			func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-				if f.Kind() != reflect.String {
-					return data, nil
-				}
-				if t.Kind() != reflect.Interface {
-					return data, nil
-				}
-				v, err := strconv.Atoi(data.(string))
-				if err != nil {
-					return data, nil
-				}
-				return v, nil
-			},
-		),
-	)
-
-	err := viper.Unmarshal(&cfg, f)
+	var err error
+	cfg, err = apiserver.LoadConfigFromReader(bytes.NewBuffer(configString))
 	s.NoError(err)
 
 	log.Info(cfg)

@@ -36,28 +36,6 @@ var backoff = wait.Backoff{
 var CommitSHA = "unknown"
 var BuildTime = "unknown"
 
-type KubernetesKonfig struct {
-	KubeConfigPath string `mapstructure:"kubeconfigpath"`
-	Namespace      string `mapstructure:"namespace"`
-}
-
-type LogConfig struct {
-	LogLevel string `mapstructure:"loglevel"`
-}
-
-type ServerConfig struct {
-	Port int `mapstructure:"port"`
-}
-
-type Config struct {
-	DbConfig         storage.DbConfig `mapstructure:"db"`
-	KubernetesKonfig KubernetesKonfig `mapstructure:"kubernetes"`
-	AuthConfig       auth.AuthConfig  `mapstructure:"auth"`
-
-	LogConfig    LogConfig    `mapstructure:"logging"`
-	ServerConfig ServerConfig `mapstructure:"server"`
-}
-
 type flowifyServer struct {
 	k8Client      kubernetes.Interface
 	namespace     string

@@ -3,75 +3,18 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
-	"reflect"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
-	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 
 	"github.com/equinor/flowify-workflows-server/apiserver"
-
-	"gopkg.in/yaml.v3"
 )
 
 const (
 	maxWait = time.Second * 10
 )
-
-func LoadConfig(path string) (config apiserver.Config, err error) {
-	viper.AddConfigPath(path)
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-
-	viper.AutomaticEnv() // let env override config if available
-
-	// to allow environment parse nested config
-	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`))
-
-	// prefix all envs for uniqueness
-	viper.SetEnvPrefix("FLOWIFY")
-
-	err = viper.ReadInConfig()
-	if err != nil {
-		return
-	}
-
-	/*
-		for _, k := range viper.AllKeys() {
-			value := viper.GetString(k)
-			log.Infoln(k, " : ", value)
-		}
-	*/
-
-	f := viper.DecodeHook(
-		mapstructure.ComposeDecodeHookFunc(
-			// Try to silent convert string to int
-			// Port env var can be set as the string, not as required int
-			func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-				if f.Kind() != reflect.String {
-					return data, nil
-				}
-				if t.Kind() != reflect.Interface {
-					return data, nil
-				}
-				v, err := strconv.Atoi(data.(string))
-				if err != nil {
-					return data, nil
-				}
-				return v, nil
-			},
-		),
-	)
-
-	err = viper.Unmarshal(&config, f)
-	return
-}
 
 var status = 0
 
@@ -99,9 +42,9 @@ func main() {
 	log.RegisterExitHandler(logFatalHandler)
 
 	// read config, possible overloaded by ENV VARS
-	cfg, err := LoadConfig(".")
+	cfg, err := apiserver.LoadConfigFromPath(".")
 	if err != nil {
-		log.Error("could not load config")
+		log.Error("could not load config, ", err)
 		return
 	}
 
@@ -138,18 +81,7 @@ func main() {
 
 	// handle config output
 	if isFlagPassed("dumpconfig") {
-		switch *dumpConfig {
-		case "-":
-			// stdout
-			bytes, err := yaml.Marshal(viper.AllSettings())
-			if err != nil {
-				log.Error("Could not dump config", err)
-				return
-			}
-			fmt.Println(string(bytes))
-		default:
-			viper.WriteConfigAs(*dumpConfig)
-		}
+		cfg.Dump(*dumpConfig)
 	}
 
 	// LogConfig is handled directly
