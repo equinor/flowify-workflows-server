@@ -2,22 +2,72 @@
 
 Flowify is an Equinor developed workflow manager based on the [Argo workflows](https://argoproj.github.io/argo-workflows/) project.
 The aim of the project is to provide a simple and non-technical user interface to help users build and execute data- or compute-intensive
-workflows on a Kubernetes platform. This repository contains the server part of the Flowify project, the client is hosted [elsewhere](https://github.com/equinor/flowify).
+workflows on a Kubernetes platform. This repository contains the server part of the Flowify project, the client is hosted [elsewhere](https://github.com/equinor/flowify-workflows-UI).
 
 ## Installation and deployment
 
-The Flowify project is used as a service, so end users do not need to install it locally. The service gets automatically deployed to the [Aurora platform](https://docs.aurora.equinor.com/) via the Github Actions CI/CD pipeline.
+To deploy on a Kubernetes cluster, see https://equinor.github.io/flowify-documentation/run_k8s/
 
 ## Development
 
-To build the Flowify server requirements
-
-- Go 1.17.1
-
-When building a Docker image for the server
+Tested requirements (other versions may work)
 
 - Docker 20.10.8
+- Docker compose 2.10.2
 
+To start-up development environment
+```bash
+git clone git@github.com:equinor/flowify-workflows-server.git
+cd dev
+docker compose up -d
+```
+Note: The kind cluster will take some time to spin up.
+
+To rebuild the server after code changes
+```bash
+docker compose up -d --build server
+```
+The following services will be available at:
+| Service      | Port |
+| -----------         | ----------- |
+| Flowify server      | 8842       |
+| MongoDB   | 27017        |
+
+### Optional: To start an developer instance of the Frontend:
+
+Set the following dummy JWT token as environmental variable on your local host
+```bash
+export FLOWIFY_AUTH_TOKEN="Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzYW5kYm94IiwiYXVkIjoiZmxvd2lmeSIsImlhdCI6MTY2MzY3NDU0NywibmJmIjoxNjYzNjc0NTQ3LCJleHAiOjI2MTA0NDU3NDcsIm9pZCI6IjgwNDgiLCJuYW1lIjoiRi4gTG93ZSIsImVtYWlsIjoiZmxvd0BzYW5kLmJveCIsInJvbGVzIjpbInNhbmRib3gtZGV2ZWxvcGVyIl19.Hc4gXrL6hsE91S6qlJpFfsONq7L-jTN9WsHxtC1fhGk"
+```
+
+```bash
+git clone git@github.com:equinor/flowify-workflows-UI.git
+docker build . -t flowify/dev_frontend
+docker run -d --rm --name flowify_ui -p 8080:8080 --network kind -e FLOWIFY_AUTH_TOKEN flowify/dev_frontend
+```
+
+### Deployment architecture of development environment
+
+```mermaid
+C4Container
+Deployment_Node(c1, "Docker network: kind") {
+    Deployment_Node(d_com, "docker-compose"){
+        Container(kind, "kind Cluster running Argo Workflows")
+        Container(mongo, "MongoDB")
+        Container(server, "Flowify server")
+    }
+    Container(ctrl, "cluster-control-plane")
+    Container(ui, "Flowify UI (Optional)")
+
+}
+System_Ext(host, "Local host")
+
+Rel(kind, ctrl, "SIGTERM")
+BiRel(host, mongo, "Port 27017")
+BiRel(host, server, "Port 8842")
+BiRel(host, ui, "Port 8080")
+UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="2")
+```
 ### Summary of Makefile commands
 
 | Command        | Description                                                                                                                        |
