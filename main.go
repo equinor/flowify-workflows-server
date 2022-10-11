@@ -112,7 +112,7 @@ func main() {
 	ctx, cancel = context.WithTimeout(context.Background(), maxWait)
 	defer cancel()
 
-	log.Info("Received SIGTERM: waiting for active requests to finish...")
+	log.Info("Received SIGNAL: waiting for active requests to finish...")
 	server.HttpServer.Shutdown(ctx)
 
 	os.Exit(status)

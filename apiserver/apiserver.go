@@ -177,9 +177,9 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) erro
 
 	// Handle graceful shutdown by relaying signals
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGTERM)
+	signal.Notify(c, syscall.SIGTERM, syscall.SIGINT)
 
-	// Block until we receive SIGTERM.
+	// Block until we receive signals.
 	s := <-c
 	log.Info("Signal: ", s)
 
