@@ -124,7 +124,7 @@ func NewFlowifyServer(k8Client kubernetes.Interface,
 	}, nil
 }
 
-func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
+func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) error {
 	fs.HttpServer = fs.newHTTPServer(ctx, fs.portnumber)
 
 	// Start listener
@@ -136,23 +136,25 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
 		conn, listerErr = net.Listen("tcp", address)
 
 		if listerErr != nil {
-			log.Warnf("failed to listen: %v", listerErr)
+			log.Warnf("failed to listen at addr=%v. %v", address, listerErr)
 			return false, nil
 		}
 		return true, nil
 	})
 
 	if err != nil {
-		log.Error(errors.Wrapf(err, "cannot create listener on socket %s", address))
 		if readyNotifier != nil {
 			// signal unsuccessful startup
 			*readyNotifier <- false
 		}
-		panic("") // no return
+		// signal service failure
+		return errors.Wrap(err, "server run failure")
 	}
-	defer conn.Close()
 
 	go func() {
+		// defer close in this goroutine to make sure Connection lifespan matches usage
+		defer conn.Close()
+
 		err := fs.HttpServer.Serve(conn)
 		switch err {
 		case http.ErrServerClosed:
@@ -180,6 +182,8 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) {
 	// Block until we receive SIGTERM.
 	s := <-c
 	log.Info("Signal: ", s)
+
+	return nil
 }
 
 func logHTTPRequest(r *http.Request, start time.Time, ignoreList []string) {

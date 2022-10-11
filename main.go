@@ -97,10 +97,16 @@ func main() {
 
 	server, err := apiserver.NewFlowifyServerFromConfig(cfg)
 	if err != nil {
-		panic("Cannot create a Flowify server object")
+		log.Error("Cannot create a Flowify server object", err)
+		os.Exit(1)
 	}
 
-	server.Run(ctx, nil)
+	// run is a blocking call, but may return early on error
+	err = server.Run(ctx, nil)
+	if err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
 
 	// Create a deadline to wait for.
 	ctx, cancel = context.WithTimeout(context.Background(), maxWait)
