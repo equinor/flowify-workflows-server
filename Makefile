@@ -51,6 +51,8 @@ e2etest: server
 
 test: unittest e2etest
 
+# the docker tests run the unittests and e2etest in a dockerized environment
+
 # We build a container that has done the tests then pull out the files.
 # We should instead build a container then run the tests to an output.
 docker_test:
@@ -65,7 +67,7 @@ docker_e2e_build:
 
 
 docker_e2e_test: docker_e2e_build
-# make sure we tear down afterwards
-	bash -c "trap 'docker-compose -f dev/docker-compose.yaml down' EXIT; docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml run --rm flowify-e2e-runner"
+# explicit 'up' means we stop (but don't remove) containers afterwards
+	docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml up --timeout 5 --exit-code-from flowify-e2e-runner cluster mongo flowify-e2e-runner
 
 .PHONY: all server init clean test docker_test e2etest

@@ -9,7 +9,17 @@ WHITE='\033[0;37m'
 NOCOLOR='\033[0m' # No Color
 
 bash kind_cluster_config_export.sh
+cluster_exists=$?
 
+if [ $cluster_exist -neq 0 ]
+then
+echo -e ${RED}
+echo =====================================================================
+echo Cluster does not exist, cannot continue
+echo =====================================================================
+echo -e ${NOCOLOR}
+exit $cluster_exists
+fi
 
 echo -e ${BLUE}
 echo =====================================================================
