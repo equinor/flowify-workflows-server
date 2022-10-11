@@ -39,18 +39,23 @@ type Config struct {
 	ServerConfig ServerConfig `mapstructure:"server"`
 }
 
-func (cfg Config) Dump(path string) error {
+func (cfg Config) String() string {
 	bytes, err := yaml.Marshal(cfg)
 	if err != nil {
-		log.Error("Could not dump config", err)
-		return err
+		log.Error("Could not stringify config", err)
+		return ""
 	}
+	return string(bytes)
+}
+
+func (cfg Config) Dump(path string) error {
+	str := cfg.String()
 	switch path {
 	case "-":
 		// stdout
-		fmt.Println(string(bytes))
+		fmt.Println(str)
 	default:
-		err := os.WriteFile(path, bytes, 0666)
+		err := os.WriteFile(path, []byte(str), 0666)
 		if err != nil {
 			log.Error("Could write config to file ", path)
 			return err

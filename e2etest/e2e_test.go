@@ -90,7 +90,7 @@ db:
 
 kubernetes:
   # how to locate the kubernetes server
-  kubeconfig: SET_FROM_ENV
+  kubeconfigpath: SET_FROM_ENV
   # the namespace containing the flowify configuration and setup
   namespace: flowify-e2e
 
@@ -131,13 +131,14 @@ func make_authentication_header(usr fuser.User, secret string) (string, error) {
 }
 
 func (s *e2eTestSuite) SetupSuite() {
-	logrus.Info("Setting up e2eTestSuite")
+	log.Info("Setting up e2eTestSuite")
 
 	var err error
 	cfg, err = apiserver.LoadConfigFromReader(bytes.NewBuffer(configString))
 	s.NoError(err)
 
 	log.Info(cfg)
+	fmt.Println("Config:\n", cfg.String())
 
 	ctx := context.Background()
 

@@ -63,6 +63,7 @@ docker_e2e_test:
 # build composed testrunner image
 	docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml build flowify-e2e-runner
 # run the testrunner container 
-	docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml run  --rm flowify-e2e-runner
+#	docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml run  --rm flowify-e2e-runner
+	docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml up --remove-orphans --abort-on-container-exit --exit-code-from flowify-e2e-runner flowify-e2e-runner
 
 .PHONY: all server init clean test docker_test e2etest
