@@ -24,7 +24,5 @@ services:
       - FLOWIFY_KUBERNETES_NAMESPACE=argo
       - FLOWIFY_KUBERNETES_KUBECONFIGPATH=/root/.kube/config
       - FLOWIFY_AUTH_HANDLER=azure-oauth2-openid-token
-      - FLOWIFY_AUTH_CONFIG_ISSUER=sandbox
-      - FLOWIFY_AUTH_CONFIG_AUDIENCE=flowify
       - FLOWIFY_AUTH_CONFIG_KEYSURL=DISABLE_JWT_SIGNATURE_VERIFICATION
     command: bash -c "./kind_cluster_config_export.sh; make e2etest"
