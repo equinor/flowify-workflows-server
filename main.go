@@ -3,103 +3,18 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
-	"reflect"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
-	wfclientset "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
-	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	"k8s.io/client-go/kubernetes"
-	k8srest "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/equinor/flowify-workflows-server/apiserver"
-	"github.com/equinor/flowify-workflows-server/auth"
-	"github.com/equinor/flowify-workflows-server/storage"
-
-	"gopkg.in/yaml.v3"
 )
 
 const (
 	maxWait = time.Second * 10
 )
-
-type KubernetesKonfig struct {
-	KubeConfig string `mapstructure:"kubeconfig"`
-	Namespace  string `mapstructure:"namespace"`
-}
-
-type LogConfig struct {
-	LogLevel string `mapstructure:"loglevel"`
-}
-
-type ServerConfig struct {
-	Port int `mapstructure:"port"`
-}
-
-type Config struct {
-	DbConfig         storage.DbConfig `mapstructure:"db"`
-	KubernetesKonfig KubernetesKonfig `mapstructure:"kubernetes"`
-	AuthConfig       auth.AuthConfig  `mapstructure:"auth"`
-
-	LogConfig    LogConfig    `mapstructure:"logging"`
-	ServerConfig ServerConfig `mapstructure:"server"`
-}
-
-func LoadConfig(path string) (config Config, err error) {
-	viper.AddConfigPath(path)
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-
-	viper.AutomaticEnv() // let env override config if available
-
-	// to allow environment parse nested config
-	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`))
-
-	// prefix all envs for uniqueness
-	viper.SetEnvPrefix("FLOWIFY")
-
-	err = viper.ReadInConfig()
-	if err != nil {
-		return
-	}
-
-	/*
-		for _, k := range viper.AllKeys() {
-			value := viper.GetString(k)
-			log.Infoln(k, " : ", value)
-		}
-	*/
-
-	f := viper.DecodeHook(
-		mapstructure.ComposeDecodeHookFunc(
-			// Try to silent convert string to int
-			// Port env var can be set as the string, not as required int
-			func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-				if f.Kind() != reflect.String {
-					return data, nil
-				}
-				if t.Kind() != reflect.Interface {
-					return data, nil
-				}
-				v, err := strconv.Atoi(data.(string))
-				if err != nil {
-					return data, nil
-				}
-				return v, nil
-			},
-		),
-	)
-
-	err = viper.Unmarshal(&config, f)
-	return
-}
 
 var status = 0
 
@@ -127,7 +42,11 @@ func main() {
 	log.RegisterExitHandler(logFatalHandler)
 
 	// read config, possible overloaded by ENV VARS
-	cfg, err := LoadConfig(".")
+	cfg, err := apiserver.LoadConfigFromPath(".")
+	if err != nil {
+		log.Error("could not load config, ", err)
+		return
+	}
 
 	// Set some common flags
 	logLevel := flag.String("loglevel", "info", "Set the printout level for the logger (trace, debug, info, warn, error, fatal, panic)")
@@ -151,7 +70,7 @@ func main() {
 		cfg.DbConfig.DbName = *dbName
 	}
 	if isFlagPassed("kubeconfig") {
-		cfg.KubernetesKonfig.KubeConfig = *kubeconfig
+		cfg.KubernetesKonfig.KubeConfigPath = *kubeconfig
 	}
 	if isFlagPassed("namespace") {
 		cfg.KubernetesKonfig.Namespace = *k8sConfigNamespace
@@ -162,18 +81,7 @@ func main() {
 
 	// handle config output
 	if isFlagPassed("dumpconfig") {
-		switch *dumpConfig {
-		case "-":
-			// stdout
-			bytes, err := yaml.Marshal(viper.AllSettings())
-			if err != nil {
-				log.Error("Could not dump config", err)
-				return
-			}
-			fmt.Println(string(bytes))
-		default:
-			viper.WriteConfigAs(*dumpConfig)
-		}
+		cfg.Dump(*dumpConfig)
 	}
 
 	// LogConfig is handled directly
@@ -184,40 +92,10 @@ func main() {
 	log.SetLevel(level)
 	log.WithFields(log.Fields{"Loglevel": log.StandardLogger().Level}).Infof("Setting global loglevel")
 
-	// Kubernetes config
-	k8sConfig, err := k8srest.InClusterConfig()
-	if err != nil {
-		log.Infof("No service account detected, running locally")
-
-		k8sConfig, err = clientcmd.BuildConfigFromFlags("", cfg.KubernetesKonfig.KubeConfig)
-
-		if err != nil {
-			log.Errorf("Cannot load .kube/config from %v: %v", cfg.KubernetesKonfig.KubeConfig, err)
-			return
-		}
-	}
-
-	kubeclient := kubernetes.NewForConfigOrDie(k8sConfig)
-	argoClient := wfclientset.NewForConfigOrDie(k8sConfig)
-
-	// Auth config
-	authClient, err := auth.ResolveAuthClient(cfg.AuthConfig)
-	if err != nil {
-		log.Fatalf("no auth handler set, %v", err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	server, err := apiserver.NewFlowifyServer(kubeclient,
-		cfg.KubernetesKonfig.Namespace,
-		argoClient,
-		storage.NewMongoStorageClient(storage.NewMongoClient(cfg.DbConfig), cfg.DbConfig.DbName),
-		storage.NewMongoVolumeClient(storage.NewMongoClient(cfg.DbConfig), cfg.DbConfig.DbName),
-		cfg.ServerConfig.Port,
-		authClient,
-	)
-
+	server, err := apiserver.NewFlowifyServerFromConfig(cfg)
 	if err != nil {
 		panic("Cannot create a Flowify server object")
 	}

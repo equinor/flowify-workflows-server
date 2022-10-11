@@ -1,46 +1,22 @@
-package storage
+package storage_test
 
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"strconv"
 	"testing"
 
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
-	log "github.com/sirupsen/logrus"
+	"github.com/equinor/flowify-workflows-server/storage"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func init() {
-	if _, exists := os.LookupEnv(ext_mongo_hostname_env); !exists {
-		os.Setenv(ext_mongo_hostname_env, test_host)
-	}
-
-	if _, exists := os.LookupEnv(ext_mongo_port_env); !exists {
-		os.Setenv(ext_mongo_port_env, strconv.Itoa(test_port))
-	}
-	cfg = DbConfig{
-		DbName: test_db_name,
-		Select: "mongo",
-		Config: map[string]interface{}{
-			"Address": os.Getenv(ext_mongo_hostname_env),
-			"Port":    first(strconv.Atoi(os.Getenv(ext_mongo_port_env)))},
-	}
-
-	m := NewMongoClient(cfg)
-	log.SetOutput(ioutil.Discard)
-	log.Infof("Dropping db %s to make sure we're clean", test_db_name)
-
-	m.Database(test_db_name).Drop(context.TODO())
-
-}
-
 func TestDeleteVolume(t *testing.T) {
-	c := NewMongoVolumeClient(NewMongoClient(cfg), test_db_name)
+	c, err := storage.NewMongoVolumeClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
+
 	vol := models.FlowifyVolume{
 		Workspace: "test",
 		Uid:       models.NewComponentReference(),
@@ -63,13 +39,13 @@ func TestDeleteVolume(t *testing.T) {
 	}
 
 	badId := models.NewComponentReference()
-	err := c.DeleteVolume(context.TODO(), badId)
-	assert.ErrorContains(t, err, ErrNotFound.Error())
+	err = c.DeleteVolume(context.TODO(), badId)
+	assert.ErrorContains(t, err, storage.ErrNotFound.Error())
 
 	{
 		// no access
 		err = c.DeleteVolume(context.TODO(), vol.Uid)
-		assert.ErrorContains(t, err, ErrNoAccess.Error())
+		assert.ErrorContains(t, err, storage.ErrNoAccess.Error())
 
 		// get access
 		ws := []workspace.Workspace{{Name: vol.Workspace, HasAccess: true}}
@@ -79,17 +55,18 @@ func TestDeleteVolume(t *testing.T) {
 
 		// make sure its gone (so supply auth context in case)
 		_, err = c.GetVolume(authCtx, vol.Uid)
-		assert.ErrorContains(t, err, ErrNotFound.Error())
+		assert.ErrorContains(t, err, storage.ErrNotFound.Error())
 	}
 
 	// try without context
 	vol2, err := c.GetVolume(context.TODO(), vol.Uid)
-	assert.ErrorContains(t, err, ErrNotFound.Error())
+	assert.ErrorContains(t, err, storage.ErrNotFound.Error())
 	assert.Equal(t, models.FlowifyVolume{}, vol2, "should be empty")
 }
 
 func TestGetVolume(t *testing.T) {
-	c := NewMongoVolumeClient(NewMongoClient(cfg), test_db_name)
+	c, err := storage.NewMongoVolumeClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
 	vol := models.FlowifyVolume{
 		Workspace: "test",
@@ -115,7 +92,7 @@ func TestGetVolume(t *testing.T) {
 		{Name: "No authz context",
 			CRef:            vol.Uid,
 			WorkspaceAccess: []workspace.Workspace{{}},
-			ExpectedError:   ErrNoAccess},
+			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Good authz context",
 			CRef:            vol.Uid,
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
@@ -123,15 +100,15 @@ func TestGetVolume(t *testing.T) {
 		{Name: "Good authz context, bad ref",
 			CRef:            models.NewComponentReference(),
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
-			ExpectedError:   ErrNotFound},
+			ExpectedError:   storage.ErrNotFound},
 		{Name: "Authz context with name but no access",
 			CRef:            vol.Uid,
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
-			ExpectedError:   ErrNoAccess},
+			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Authz context with similar name/access",
 			CRef:            vol.Uid,
 			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
-			ExpectedError:   ErrNoAccess},
+			ExpectedError:   storage.ErrNoAccess},
 	}
 
 	for _, test := range testCases {
@@ -148,7 +125,8 @@ func TestGetVolume(t *testing.T) {
 }
 
 func TestPutVolume(t *testing.T) {
-	c := NewMongoVolumeClient(NewMongoClient(cfg), test_db_name)
+	c, err := storage.NewMongoVolumeClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
 	vol := models.FlowifyVolume{
 		Workspace: "test",
@@ -177,13 +155,13 @@ func TestPutVolume(t *testing.T) {
 			CRef:            vol.Uid,
 			Workspace:       "test",
 			ExpectedFail:    true,
-			ExpectedError:   ErrNoAccess},
+			ExpectedError:   storage.ErrNoAccess},
 		{Name: "No authz context (explicit)",
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
 			CRef:            vol.Uid,
 			Workspace:       "test",
 			ExpectedFail:    true,
-			ExpectedError:   ErrNoAccess},
+			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Good authz context",
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
 			CRef:            vol.Uid,
@@ -195,7 +173,7 @@ func TestPutVolume(t *testing.T) {
 			CRef:            vol.Uid,
 			Workspace:       "test2",
 			ExpectedFail:    true,
-			ExpectedError:   ErrNoAccess},
+			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Good authz context, try moving to new ws",
 			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test2", HasAccess: true}},
 			CRef:            vol.Uid,
@@ -207,13 +185,13 @@ func TestPutVolume(t *testing.T) {
 			CRef:            vol.Uid,
 			Workspace:       "test",
 			ExpectedFail:    true,
-			ExpectedError:   ErrNoAccess},
+			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Authz context with similar name/access",
 			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
 			CRef:            vol.Uid,
 			Workspace:       "test",
 			ExpectedFail:    true,
-			ExpectedError:   ErrNoAccess},
+			ExpectedError:   storage.ErrNoAccess},
 	}
 
 	for _, test := range testCases {
@@ -234,11 +212,12 @@ func TestPutVolume(t *testing.T) {
 }
 
 func TestListVolumes(t *testing.T) {
-	c := NewMongoVolumeClient(NewMongoClient(cfg), test_db_name)
+	c, err := storage.NewMongoVolumeClientFromConfig(cfg, mclient)
+	require.NoError(t, err)
 
 	{
 		// drop db to make sure that at the end DB will contain one components
-		NewMongoClient(cfg).Database(test_db_name).Drop(context.TODO())
+		mclient.Database(test_db_name).Drop(context.TODO())
 
 		// first add components to list
 		for i := 0; i < 5; i++ {
@@ -322,7 +301,7 @@ func TestListVolumes(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
 			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
-			list, err := c.ListVolumes(authzCtx, Pagination{20, 0}, test.Filters, test.Sorting)
+			list, err := c.ListVolumes(authzCtx, storage.Pagination{20, 0}, test.Filters, test.Sorting)
 			assert.Equal(t, err, test.ExpectedError)
 			if err == nil {
 			}

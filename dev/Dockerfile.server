@@ -22,6 +22,8 @@ RUN mkdir -p $GOPATH/src/github.com/equinor/
 WORKDIR $GOPATH/src/github.com/equinor/flowify-workflows-server
 COPY dev/flowify_server_runner.sh .
 RUN chmod +x ./flowify_server_runner.sh
+COPY dev/kind_cluster_config_export.sh .
+RUN chmod +x ./kind_cluster_config_export.sh
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
@@ -40,6 +42,8 @@ COPY user ./user
 COPY config.yml .
 COPY main.go .
 COPY Makefile .
+COPY e2etest ./e2etest
 RUN ["/bin/bash", "-c", "make server"]
 
-ENTRYPOINT ["/bin/bash", "flowify_server_runner.sh"]
+#ENTRYPOINT ["/bin/bash"]
+CMD ["./flowify_server_runner.sh"]
