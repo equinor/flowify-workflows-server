@@ -145,10 +145,16 @@ func (s *e2eTestSuite) SetupSuite() {
 	s.client = &http.Client{}
 	s.client.Timeout = time.Second * 30
 
-	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
-	if stdout, err := cmd.Output(); err == nil {
-		apiserver.CommitSHA = strings.TrimSuffix(string(stdout), "\n")
-		apiserver.BuildTime = time.Now().UTC().Format(time.RFC3339)
+	if apiserver.CommitSHA == "" {
+		log.Info("Trying to set build info from shel input")
+		cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+		if stdout, err := cmd.Output(); err == nil {
+			apiserver.CommitSHA = strings.TrimSuffix(string(stdout), "\n")
+			apiserver.BuildTime = time.Now().UTC().Format(time.RFC3339)
+		} else {
+			log.Error("Failed to set build info from shell")
+			s.Require().NoError(err, "Could not set up suite")
+		}
 	}
 
 	server, err := apiserver.NewFlowifyServerFromConfig(cfg)
@@ -260,13 +266,19 @@ func (s *e2eTestSuite) Test_zpages() {
 	require.Nil(s.T(), err)
 
 	s.Equal(http.StatusOK, resp.StatusCode)
-	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
-	stdout, _ := cmd.Output()
+	var git_sha string
+	if apiserver.CommitSHA != "" {
+		git_sha = apiserver.CommitSHA
+	} else {
+		cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+		stdout, err := cmd.Output()
+		s.Require().NoError(err, "not set in build and not a git dir")
+		git_sha = strings.TrimSuffix(string(stdout), "\n")
+	}
 
 	// test body
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(resp.Body)
-	git_sha := strings.TrimSuffix(string(stdout), "\n")
 	s.Equal(git_sha, buf.String(), "versionz returns git hash in body")
 
 	// test headers

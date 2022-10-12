@@ -1,10 +1,11 @@
 .DEFAULT_GOAL := all
 
 # Make sure we inject a sha into the binary, if available
-ifdef flowify_git_sha
-	FLOWIFY_GIT_SHA=$(flowify_git_sha)
+ifndef flowify_git_sha
+	flowify_git_sha=$(shell git rev-parse --short HEAD)
+$(info Set flowify_git_sha=$(flowify_git_sha) from git rev-parse /)
 else
-	FLOWIFY_GIT_SHA=$(shell git rev-parse --short HEAD)
+$(info Set flowify_git_sha=$(flowify_git_sha) from arg /)
 endif
 
 SRCS := $(shell find . -name "*.go" -not -path "./vendor/*" -not -path "./test/*" ! -name '*_test.go' -not -path "./mock/*")
@@ -20,7 +21,7 @@ all: server
 server: build/flowify-workflows-server
 
 build/flowify-workflows-server: $(SRCS)
-	CGO_ENABLED=0 go build -v -o $@ -ldflags "-X 'github.com/equinor/flowify-workflows-server/apiserver.CommitSHA=$(FLOWIFY_GIT_SHA)' -X 'github.com/equinor/flowify-workflows-server/apiserver.BuildTime=$(shell date)'"
+	CGO_ENABLED=0 go build -v -o $@ -ldflags "-X 'github.com/equinor/flowify-workflows-server/apiserver.CommitSHA=$(flowify_git_sha)' -X 'github.com/equinor/flowify-workflows-server/apiserver.BuildTime=$(shell date -Is)'"
 	$(STRIP) $@
 
 init:
@@ -40,14 +41,14 @@ ifdef UNITTEST_COVERAGE
 	rm -f pipe1
 	mkfifo pipe1
 	(tee testoutputs/unittest.log | go-junit-report > testoutputs/report.xml) < pipe1 &
-	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest` -covermode=count -coverprofile=coverage.out 2>&1 -v > pipe1
+	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest` -covermode=count -coverprofile=coverage.out -ldflags "-X 'github.com/equinor/flowify-workflows-server/apiserver.CommitSHA=$(FLOWIFY_GIT_SHA)' -X 'github.com/equinor/flowify-workflows-server/apiserver.BuildTime=$(shell date -Is)'" 2>&1 -v > pipe1
 	gcov2lcov -infile=coverage.out -outfile=testoutputs/coverage.lcov
 else
 	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest`
 endif
 
 e2etest: server
-	$(MAKE) -C e2etest all
+	$(MAKE) -C e2etest all flowify_git_sha=$(flowify_git_sha)
 
 test: unittest e2etest
 
@@ -56,18 +57,23 @@ test: unittest e2etest
 # We build a container that has done the tests then pull out the files.
 # We should instead build a container then run the tests to an output.
 docker_test:
-	docker-compose -f docker-compose-tests.yaml build
-	docker-compose -f docker-compose-tests.yaml up --exit-code-from app
+	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f docker-compose-tests.yaml build
+	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f docker-compose-tests.yaml up --exit-code-from app
 
 docker_e2e_build:
 # build base services
 	docker-compose -f dev/docker-compose.yaml build 
 # build composed testrunner image
-	docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml build flowify-e2e-runner
+	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml build flowify-e2e-runner
 
 
 docker_e2e_test: docker_e2e_build
 # explicit 'up' means we stop (but don't remove) containers afterwards
-	docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml up --timeout 5 --exit-code-from flowify-e2e-runner cluster mongo flowify-e2e-runner
+	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml up --timeout 5 --exit-code-from flowify-e2e-runner cluster mongo flowify-e2e-runner
+
+docker_e2e_test_run: docker_e2e_build
+# explicit 'run' means we dont stop other containers afterwards
+	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml run flowify-e2e-runner
+
 
 .PHONY: all server init clean test docker_test e2etest

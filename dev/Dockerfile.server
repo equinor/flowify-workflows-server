@@ -43,7 +43,7 @@ COPY config.yml .
 COPY main.go .
 COPY Makefile .
 COPY e2etest ./e2etest
-RUN ["/bin/bash", "-c", "make server"]
+ARG FLOWIFY_GIT_SHA
+RUN ["/bin/bash", "-c", "make server strip=1 flowify_git_sha=${FLOWIFY_GIT_SHA}"]
 
-#ENTRYPOINT ["/bin/bash"]
 CMD ["./flowify_server_runner.sh"]

@@ -7,6 +7,8 @@ services:
     build:
       context: ../
       dockerfile: dev/Dockerfile.server
+      args:
+        - FLOWIFY_GIT_SHA=${FLOWIFY_GIT_SHA}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -25,4 +27,4 @@ services:
       - FLOWIFY_KUBERNETES_KUBECONFIGPATH=/root/.kube/config
       - FLOWIFY_AUTH_HANDLER=azure-oauth2-openid-token
       - FLOWIFY_AUTH_CONFIG_KEYSURL=DISABLE_JWT_SIGNATURE_VERIFICATION
-    command: bash -c "./kind_cluster_config_export.sh; make e2etest"
+    command: bash -c "./kind_cluster_config_export.sh; export; make e2etest flowify_git_sha=$FLOWIFY_GIT_SHA"
