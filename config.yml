@@ -18,7 +18,7 @@ db:
 
 kubernetes:
   # how to locate the kubernetes server
-  kubeconfig: SET_FROM_ENV
+  kubeconfigpath: SET_FROM_ENV
   # the namespace containing the flowify configuration and setup
   namespace: flowify
 

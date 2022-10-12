@@ -1,30 +1,38 @@
 package apiserver
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/equinor/flowify-workflows-server/auth"
-	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func init() {
-	log.SetOutput(ioutil.Discard)
-}
+const (
+	test_server_port       = 1234
+	mongo_test_host        = "localhost"
+	mongo_test_port        = 27017
+	test_db_name           = "test"
+	test_namespace         = "testing-namespace"
+	n_items                = 5
+	ext_mongo_hostname_env = "FLOWIFY_MONGO_ADDRESS"
+	ext_mongo_port_env     = "FLOWIFY_MONGO_PORT"
+)
 
 type testCase struct {
-	Name string
-	URL  string
+	Name       string
+	URL        string
+	StatusCode int
+	Body       string
 }
 
-func Test_Routes(t *testing.T) {
-
-	fs, err := NewFlowifyServer(
+func Test_ApiServer(t *testing.T) {
+	server, err := NewFlowifyServer(
 		fake.NewSimpleClientset(),
 		"not-used", /* config namespace for k8s */
 		nil,        /* wfclient cs_workflow.Interface */
@@ -33,34 +41,34 @@ func Test_Routes(t *testing.T) {
 		1234,
 		auth.AzureTokenAuthenticator{},
 	)
+	require.NoError(t, err)
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	/*
+		spin up a apiserver server with some functionality not connected
+	*/
 
-	mux := mux.NewRouter()
-	fs.registerApplicationRoutes(mux)
+	ready := make(chan bool, 1)
+	go server.Run(context.TODO(), &ready)
+
+	require.True(t, <-ready, "make sure the server started before we continue")
 
 	testcases := []testCase{
-		{Name: "api/v1", URL: "/api/v1/components/"},
-		{Name: "z-page/live", URL: "/livez"},
-		{Name: "z-page/ready", URL: "/readyz"},
-		{Name: "z-page/version", URL: "/versionz"},
+		{Name: "z-page/live", URL: "livez", StatusCode: http.StatusOK, Body: "alive"},
+		{Name: "z-page/ready", URL: "readyz", StatusCode: http.StatusOK, Body: "ready"},
+		{Name: "z-page/version", URL: "versionz", StatusCode: http.StatusOK, Body: CommitSHA},
 	}
 
 	for _, test := range testcases {
 		t.Run(test.Name, func(t *testing.T) {
-			// TODO: the binary needs at the correct path to work. This should be fixed.
-			if test.Name == "swagger" {
-				t.Skip()
-			}
+			endpoint := fmt.Sprintf("http://localhost:%d/%s", test_server_port, test.URL)
+			resp, err := http.Get(endpoint)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
 
-			req := httptest.NewRequest(http.MethodGet, test.URL, nil)
-			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, req)
-			res := w.Result()
-
-			require.NotEqual(t, http.StatusNotFound, res.StatusCode)
+			assert.Equal(t, test.StatusCode, resp.StatusCode)
+			payload, err := ioutil.ReadAll(resp.Body)
+			assert.NoError(t, err)
+			assert.Equal(t, test.Body, string(payload))
 		})
 	}
 }

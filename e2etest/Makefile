@@ -1,6 +1,6 @@
 all: e2etest
 
 e2etest:
-	./test.sh
+	go test -v .
 
 .PHONY: e2etest

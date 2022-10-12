@@ -1,10 +1,35 @@
-FROM ghcr.io/equinor/flowify-dev-builder:latest as devserver
+FROM golang:1.18-alpine as base
+LABEL description="Flowify dev environment"
+RUN apk add --no-cache \
+    bash \
+    binutils \
+    curl \
+    docker \
+    gcc \
+    git \
+    jq \
+    make \
+    musl-dev \
+    openssl \
+    shadow 
+
+FROM base as buildbase
+WORKDIR /root
+RUN curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.15.0/kind-linux-amd64 && \
+    chmod +x ./kind && \
+    mv ./kind /usr/local/bin/kind
+RUN mkdir -p $GOPATH/src/github.com/equinor/
+WORKDIR $GOPATH/src/github.com/equinor/flowify-workflows-server
+COPY dev/flowify_server_runner.sh .
+RUN chmod +x ./flowify_server_runner.sh
+COPY dev/kind_cluster_config_export.sh .
+RUN chmod +x ./kind_cluster_config_export.sh
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
 ENV PATH="${PATH}:/root"
 
- 
+FROM buildbase as devserver
 COPY apiserver ./apiserver
 COPY auth ./auth
 COPY cmd ./cmd
@@ -17,6 +42,8 @@ COPY user ./user
 COPY config.yml .
 COPY main.go .
 COPY Makefile .
+COPY e2etest ./e2etest
 RUN ["/bin/bash", "-c", "make server"]
 
-ENTRYPOINT ["/bin/bash", "flowify_server_runner.sh"]
+#ENTRYPOINT ["/bin/bash"]
+CMD ["./flowify_server_runner.sh"]

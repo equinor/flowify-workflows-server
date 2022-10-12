@@ -74,7 +74,7 @@ func (c CosmosConfig) ConnectionString() (string, error) {
 	return string(uri), nil
 }
 
-func NewMongoClient(config DbConfig) *mongo.Client {
+func NewMongoClientFromConfig(config DbConfig) (*mongo.Client, error) {
 	ctx := context.TODO()
 
 	var uri string
@@ -83,32 +83,32 @@ func NewMongoClient(config DbConfig) *mongo.Client {
 		var cfg MongoConfig
 		err := mapstructure.Decode(config.Config, &cfg)
 		if err != nil {
-			return nil
+			return nil, errors.Wrap(err, "could not create new MongoClient")
 		}
 		uri, err = cfg.ConnectionString()
 		if err != nil {
-			return nil
+			return nil, errors.Wrap(err, "could not decode connection string")
 		}
 	case "cosmos":
 		var cfg CosmosConfig
 		err := mapstructure.Decode(config.Config, &cfg)
 		if err != nil {
-			return nil
+			return nil, errors.Wrap(err, "could not create new MongoClient")
 		}
 		uri, err = cfg.ConnectionString()
 		if err != nil {
-			return nil
+			return nil, errors.Wrap(err, "could not decode connection string")
 		}
 	}
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetDirect(true))
 
 	if err != nil {
-		log.WithFields(log.Fields{"URL": uri}).Fatal("Cannot connect Mongo client")
-		panic(err.Error())
+		log.WithFields(log.Fields{"URL": uri, "Config": config}).Fatal("Cannot connect Mongo client")
+		return nil, errors.Wrap(err, "could not connect to client")
 	}
 
-	return client
+	return client, nil
 }
 
 const (
@@ -131,6 +131,27 @@ type MongoStorageClient struct {
 }
 
 type getCollection func() *mongo.Collection
+
+func NewMongoStorageClientFromConfig(config DbConfig, client *mongo.Client) (ComponentClient, error) {
+	// check that client is ok
+	if client == nil {
+		log.Info("Nil mongo client is passed so a new client will be created. It is good practice to share clients")
+		nclient, err := NewMongoClientFromConfig(config)
+		if err != nil {
+			log.Error("Cannot create new client")
+			return nil, errors.Wrap(err, "Could not create new mongo client")
+		}
+		client = nclient
+	}
+
+	if client.Ping(context.TODO(), nil) != nil {
+		log.Error("Cannot connect to database. Check configuration")
+		return &MongoStorageClient{}, fmt.Errorf("Cannot connect to database. Check configuration")
+	}
+
+	log.Infof("Connected to mongodb (%s), with db name %s", config, config.DbName)
+	return &MongoStorageClient{client: client, db_name: config.DbName}, nil
+}
 
 func NewMongoStorageClient(client *mongo.Client, dbname string) ComponentClient {
 	if client == nil || client.Ping(context.TODO(), nil) != nil {
