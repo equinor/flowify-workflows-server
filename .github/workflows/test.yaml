@@ -4,6 +4,7 @@ on:
   push:
     paths-ignore:
       - ".github/**"
+      - "dev/**"
 jobs:
   tests:
     name: Run all tests

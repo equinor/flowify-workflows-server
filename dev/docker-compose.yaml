@@ -16,10 +16,11 @@ services:
 
   cluster:
     container_name: kind_cluster
-    build:
-      context: ../
-      dockerfile: dev/Dockerfile.cluster
-    image: dev_cluster
+    # build:
+    #   context: ../
+    #   dockerfile: dev/Dockerfile.cluster
+    # image: dev_cluster
+    image: ghcr.io/equinor/flowify-dev-cluster:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:

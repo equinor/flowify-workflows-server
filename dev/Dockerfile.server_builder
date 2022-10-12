@@ -1,5 +1,5 @@
 FROM golang:1.18-alpine as base
-LABEL description="Flowify dev environment"
+LABEL description="Flowify dev environment builder"
 RUN apk add --no-cache \
     bash \
     binutils \
