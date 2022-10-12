@@ -56,6 +56,7 @@ git clone git@github.com:equinor/flowify-workflows-UI.git
 docker build . -t dev_frontend
 docker run -d --rm --name flowify_ui -p 8080:8080 --network kind -e FLOWIFY_AUTH_TOKEN dev_frontend
 ```
+Frontend will be available at http://localhost:8080
 
 ### Deployment architecture of development environment
 
