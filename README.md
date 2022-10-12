@@ -39,11 +39,22 @@ Set the following dummy JWT token as environmental variable on your local host
 ```bash
 export FLOWIFY_AUTH_TOKEN="Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzYW5kYm94IiwiYXVkIjoiZmxvd2lmeSIsImlhdCI6MTY2MzY3NDU0NywibmJmIjoxNjYzNjc0NTQ3LCJleHAiOjI2MTA0NDU3NDcsIm9pZCI6IjgwNDgiLCJuYW1lIjoiRi4gTG93ZSIsImVtYWlsIjoiZmxvd0BzYW5kLmJveCIsInJvbGVzIjpbInNhbmRib3gtZGV2ZWxvcGVyIl19.Hc4gXrL6hsE91S6qlJpFfsONq7L-jTN9WsHxtC1fhGk"
 ```
-
+Alternatively encode the following claims to a JWT token and set as value of environmental variable `FLOWIFY_AUTH_TOKEN`
+```
+"name":  "F. Lowe",
+"email": "flow@flowify.io",
+"roles": [""], <= needs to match the dev-environment
+"iat":   time.Now().Unix(),
+"nbf":   time.Now().Unix(),
+"exp":   time.Now().Add(time.Minute * 5).Unix(), // at least enough into the future
+"aud":   "flowify", <= needs to match the dev-environment     
+"iss":   "sandbox", <= needs to match the dev-environment
+```
+Run the frontend and attach to the docker network
 ```bash
 git clone git@github.com:equinor/flowify-workflows-UI.git
-docker build . -t flowify/dev_frontend
-docker run -d --rm --name flowify_ui -p 8080:8080 --network kind -e FLOWIFY_AUTH_TOKEN flowify/dev_frontend
+docker build . -t dev_frontend
+docker run -d --rm --name flowify_ui -p 8080:8080 --network kind -e FLOWIFY_AUTH_TOKEN dev_frontend
 ```
 
 ### Deployment architecture of development environment
