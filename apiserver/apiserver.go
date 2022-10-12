@@ -163,7 +163,7 @@ func (fs *flowifyServer) Run(ctx context.Context, readyNotifier *chan bool) erro
 			log.Info("Server goroutine error: ", err)
 		}
 	}()
-	log.WithFields(log.Fields{"version": CommitSHA, "port": address}).Info("✨ Flowify server started successfully ✨")
+	log.WithFields(log.Fields{"version": CommitSHA, "buildtime": BuildTime, "port": address}).Info("✨ Flowify server started successfully ✨")
 
 	if readyNotifier != nil {
 		log.Info("Notify 'ready' channel")

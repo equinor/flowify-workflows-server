@@ -149,7 +149,7 @@ func NewMongoStorageClientFromConfig(config DbConfig, client *mongo.Client) (Com
 		return &MongoStorageClient{}, fmt.Errorf("Cannot connect to database. Check configuration")
 	}
 
-	log.Infof("Connected to mongodb (%s), with db name %s", config, config.DbName)
+	log.Infof("Connected to mongodb (%v), with db name %s", config, config.DbName)
 	return &MongoStorageClient{client: client, db_name: config.DbName}, nil
 }
 

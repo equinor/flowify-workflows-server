@@ -12,6 +12,8 @@ services:
     build:
       context: .
       target: tester
+      args:
+        - FLOWIFY_GIT_SHA=${FLOWIFY_GIT_SHA}
     environment:
       FLOWIFY_DB_CONFIG_ADDRESS: mongo
       FLOWIFY_DB_CONFIG_PORT: 27017
@@ -19,4 +21,4 @@ services:
       - mongo
     volumes:
       - ./testoutputs:/go/src/github.com/equinor/flowify-workflows-server/testoutputs
-    command: make UNITTEST_COVERAGE=1 unittest
+    command: make UNITTEST_COVERAGE=1 unittest flowify_git_sha=${FLOWIFY_GIT_SHA}
