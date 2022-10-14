@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/equinor/flowify-workflows-server/models"
@@ -19,25 +18,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-const (
-	db_host                = "localhost"
-	db_port                = 27017
-	ext_mongo_hostname_env = "FLOWIFY_MONGO_ADDRESS"
-	ext_mongo_port_env     = "FLOWIFY_MONGO_PORT"
-)
-
-func init() {
-	if _, exists := os.LookupEnv(ext_mongo_hostname_env); !exists {
-		os.Setenv(ext_mongo_hostname_env, db_host)
-	}
-
-	if _, exists := os.LookupEnv(ext_mongo_port_env); !exists {
-		os.Setenv(ext_mongo_port_env, strconv.Itoa(db_port))
-	}
-}
-
 func myUsage() {
-	fmt.Printf("Usage: %s [OPTIONS] [cmpRef]\n", os.Args[0])
+	fmt.Printf("Usage: %s [OPTIONS] cmpRef\n", os.Args[0])
 	flag.PrintDefaults()
 }
 

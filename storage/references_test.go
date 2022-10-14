@@ -82,7 +82,7 @@ const (
 			  },
 			  {
 				"id": "N2M1B1",
-				"node": "192161d7-e3f2-4991-adc0-a99c88c144c3"
+				"node": { "uid": "192161d7-e3f2-4991-adc0-a99c88c144c3" }
 			  }
 			],
 			"edges": []
@@ -337,6 +337,7 @@ func init() {
 }
 
 func TestDereferenceComponent(t *testing.T) {
+	mclient.Database(test_db_name).Drop(context.TODO())
 	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
 	require.NoError(t, err)
 
