@@ -337,6 +337,7 @@ func init() {
 }
 
 func TestDereferenceComponent(t *testing.T) {
+	mclient.Database(test_db_name).Drop(context.TODO())
 	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
 	require.NoError(t, err)
 

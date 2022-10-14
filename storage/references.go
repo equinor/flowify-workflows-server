@@ -36,7 +36,7 @@ func drefNode(ctx context.Context, client ComponentClient, node *models.Node) (m
 		}
 		obj := models.Node{Id: node.Id, Node: cmp}
 		return obj, nil
-	case *models.CRefVersion:
+	case models.CRefVersion:
 		cmp, err := drefComponent(ctx, client, node.Node.(models.CRefVersion))
 		if err != nil {
 			return models.Node{}, errors.Wrapf(err, "Cannot dereference node, id: %s", node.Id)
