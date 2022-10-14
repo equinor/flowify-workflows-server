@@ -23,7 +23,7 @@ type AzureConfig struct {
 	KeysUrl  string
 }
 
-func NewAuthClientFromConfig(config AuthConfig) (AuthClient, error) {
+func NewAuthClientFromConfig(config AuthConfig) (AuthenticationClient, error) {
 
 	switch config.Handler {
 	case "azure-oauth2-openid-token":

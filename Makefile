@@ -73,7 +73,7 @@ docker_e2e_test: docker_e2e_build
 
 docker_e2e_test_run: docker_e2e_build
 # explicit 'run' means we dont stop other containers afterwards
-	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml run flowify-e2e-runner
+	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml run --rm flowify-e2e-runner
 
 
 .PHONY: all server init clean test docker_test e2etest
