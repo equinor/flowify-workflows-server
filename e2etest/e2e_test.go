@@ -173,8 +173,6 @@ func (s *e2eTestSuite) SetupSuite() {
 			Namespace: cfg.KubernetesKonfig.Namespace}}
 		ns, err = s.kubeclient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		s.NoError(err)
-	} else {
-		fmt.Println("ns found", cfg.KubernetesKonfig.Namespace)
 	}
 
 	if _, err := s.kubeclient.CoreV1().ConfigMaps(cfg.KubernetesKonfig.Namespace).Get(context.TODO(), wsName, metav1.GetOptions{}); k8serrors.IsNotFound(err) {
@@ -185,8 +183,6 @@ func (s *e2eTestSuite) SetupSuite() {
 		}, Data: map[string]string{"roles": "[[\"tester\"]]"}}
 		ws_test, err = s.kubeclient.CoreV1().ConfigMaps(cfg.KubernetesKonfig.Namespace).Create(context.TODO(), ws_test, metav1.CreateOptions{})
 		s.NoError(err)
-	} else {
-		fmt.Println("Ws found", wsName)
 	}
 
 	// make sure we get the ready signal
