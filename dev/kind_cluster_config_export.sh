@@ -11,7 +11,7 @@ NOCOLOR='\033[0m' # No Color
 bash -c 'kind export --name cluster kubeconfig 2>/dev/null'
 cluster_exist=$?
 
-if [ $cluster_exist -eq 0 ]
+if [ "$cluster_exist" -eq 0 ]
 then 
   echo -e ${GREEN}
   echo =====================================================================
