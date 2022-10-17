@@ -11,7 +11,7 @@ NOCOLOR='\033[0m' # No Color
 bash kind_cluster_config_export.sh
 cluster_exists=$?
 
-if [ $cluster_exist -neq 0 ]
+if [ "$cluster_exist" -neq 0 ]
 then
 echo -e ${RED}
 echo =====================================================================
