@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path"
 	"testing"
 
@@ -80,11 +82,70 @@ func ResponseBodyBytes(resp *http.Response) []byte {
 }
 
 type MockAuthorization struct {
-	GivenPermissions auth.Permission
+	Access bool
 }
 
-func (m MockAuthorization) Authorize(subject string, action string, req auth.Permission, user user.User, object any) (bool, error) {
-	return auth.HasPermission(req, m.GivenPermissions), nil
+func (m MockAuthorization) Authorize(subject auth.Subject, action auth.Action, user user.User, object any) (bool, error) {
+	return m.Access, nil
+}
+
+func Fail(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusUnauthorized)
+	fmt.Fprintf(w, "no access")
+}
+func Pass(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "OK")
+}
+
+func first[T any](t T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+func Test_PathAuthorization(t *testing.T) {
+	mux := gmux.NewRouter()
+	sclient := NewMockSecrets()
+	sclient.On("ListAvailableKeys", mock.Anything, mock.Anything).Return([]string{"s1", "s3"}, nil)
+
+	authz := MockAuthorization{Access: true}
+
+	mux.HandleFunc("/", rest.PathAuthorization(auth.Secrets, auth.List, "workspace", authz, Pass)).Methods(http.MethodGet)
+	mux.HandleFunc("/{workspace}/", rest.PathAuthorization(auth.Secrets, auth.List, "workspace", authz, Pass)).Methods(http.MethodGet)
+
+	URL, err := url.Parse("/")
+	require.NoError(t, err)
+
+	type test struct {
+		Name           string
+		WorkspacePath  *url.URL
+		ExpectedResult int
+	}
+
+	for _, test := range []test{
+		{
+			Name:           "no workspace var in request",
+			WorkspacePath:  first(url.Parse("")),
+			ExpectedResult: http.StatusUnauthorized,
+		},
+		{
+			Name:           "with workspace",
+			WorkspacePath:  first(url.Parse("/workspace-name/")),
+			ExpectedResult: http.StatusOK,
+		},
+	} {
+		t.Run(test.Name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, URL.ResolveReference(test.WorkspacePath).String(), nil)
+			w := httptest.NewRecorder()
+
+			mux.ServeHTTP(w, req)
+			res := w.Result()
+			require.Equal(t, test.ExpectedResult, res.StatusCode, BodyStringer{res.Body})
+		})
+	}
+
 }
 
 func Test_ListSecretsHTTPHandler(t *testing.T) {
@@ -92,7 +153,7 @@ func Test_ListSecretsHTTPHandler(t *testing.T) {
 
 	sclient := NewMockSecrets()
 
-	authz := MockAuthorization{GivenPermissions: auth.Permission{}}
+	authz := MockAuthorization{Access: false}
 
 	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1), sclient, &authz)
 
@@ -103,28 +164,28 @@ func Test_ListSecretsHTTPHandler(t *testing.T) {
 	for _, test := range []struct {
 		Name                       string
 		Workspace                  string
-		Permissions                auth.Permission
+		Access                     bool
 		ExpectedResponseStatusCode int
 		ClientResponse             ClientResponse
 	}{
 		{
 			Name:                       "test list pass",
 			Workspace:                  "mock",
-			Permissions:                auth.Permission{Read: true},
+			Access:                     true,
 			ExpectedResponseStatusCode: http.StatusOK,
 			ClientResponse:             ClientResponse{Keys: []string{"s1", "s3"}, Error: nil},
 		},
 		{
 			Name:                       "test list authz fail",
 			Workspace:                  "mock",
-			Permissions:                auth.Permission{},
+			Access:                     false,
 			ClientResponse:             ClientResponse{Keys: []string{"s1", "s3"}, Error: nil},
 			ExpectedResponseStatusCode: http.StatusUnauthorized,
 		},
 		{
 			Name:                       "test list client fail",
 			Workspace:                  "mock",
-			Permissions:                auth.Permission{Read: true},
+			Access:                     true,
 			ClientResponse:             ClientResponse{Keys: []string{}, Error: errors.Errorf("could not list keys %s", "mock")},
 			ExpectedResponseStatusCode: http.StatusInternalServerError,
 		},
@@ -137,16 +198,16 @@ func Test_ListSecretsHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// override authz for test
-			authz.GivenPermissions = test.Permissions
+			authz.Access = test.Access
 
 			call := sclient.On("ListAvailableKeys", mock.Anything, mock.Anything).Return(test.ClientResponse.Keys, test.ClientResponse.Error)
+			defer call.Unset()
 
 			mux.ServeHTTP(w, req)
 			res := w.Result()
 
 			require.Equal(t, test.ExpectedResponseStatusCode, w.Code, URL, BodyStringer{res.Body})
 
-			call.Unset()
 		})
 	}
 }
@@ -157,7 +218,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 	sclient := NewMockSecrets()
 	sclient.On("ListAvailableKeys", mock.Anything, mock.Anything).Return([]string{"s1", "s3"}, nil)
 
-	authz := MockAuthorization{GivenPermissions: auth.Permission{}}
+	authz := MockAuthorization{Access: false}
 	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1), sclient, &authz)
 
 	for _, test := range []struct {
@@ -167,7 +228,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 		Body                       []byte
 		Key                        string
 		Secret                     rest.SecretField
-		Permissions                auth.Permission
+		Access                     bool
 		ExpectedResponseStatusCode int
 	}{
 		{
@@ -175,15 +236,15 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 			Workspace:                  "mock",
 			Key:                        "s2",
 			Secret:                     rest.SecretField{Key: "s2", Value: "***"},
-			Permissions:                auth.Permission{Write: true},
+			Access:                     true,
 			ExpectedResponseStatusCode: http.StatusCreated,
 		},
 		{
-			Name:                       "add secret passing only read access",
+			Name:                       "add secret passing no access",
 			Workspace:                  "mock",
 			Key:                        "s2",
 			Secret:                     rest.SecretField{Key: "s2", Value: "***"},
-			Permissions:                auth.Permission{Read: true},
+			Access:                     false,
 			ExpectedResponseStatusCode: http.StatusUnauthorized,
 		},
 		{
@@ -192,7 +253,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 			Key:                        "s2",
 			Secret:                     rest.SecretField{Key: "s2", Value: "***"},
 			Body:                       []byte("{}"),
-			Permissions:                auth.Permission{Write: true},
+			Access:                     true,
 			ExpectedResponseStatusCode: http.StatusBadRequest,
 		},
 		{
@@ -201,7 +262,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 			Key:                        "s2",
 			Secret:                     rest.SecretField{Key: "s2", Value: "***"},
 			Body:                       []byte("{"),
-			Permissions:                auth.Permission{Write: true},
+			Access:                     true,
 			ExpectedResponseStatusCode: http.StatusBadRequest,
 		},
 		{
@@ -209,7 +270,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 			Workspace:                  "mock",
 			Key:                        "s1",
 			Secret:                     rest.SecretField{Key: "s2", Value: "***"},
-			Permissions:                auth.Permission{Write: true},
+			Access:                     true,
 			ExpectedResponseStatusCode: http.StatusBadRequest,
 		},
 		{
@@ -217,7 +278,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 			Workspace:                  "mock",
 			Key:                        "s1",
 			Secret:                     rest.SecretField{Key: "s1", Value: "***"},
-			Permissions:                auth.Permission{Write: true},
+			Access:                     true,
 			ExpectedResponseStatusCode: http.StatusNoContent,
 		},
 		{
@@ -225,7 +286,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 			Workspace:                  "mock",
 			Key:                        "s2",
 			Secret:                     rest.SecretField{Key: "s2", Value: "***"},
-			Permissions:                auth.Permission{Write: true},
+			Access:                     true,
 			OnAddResponse:              errors.Errorf("could not add secret %s", "key"),
 			ExpectedResponseStatusCode: http.StatusInternalServerError,
 		},
@@ -243,6 +304,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 
 			// add a custom response to secret client
 			c := sclient.On("AddSecretKey", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(test.OnAddResponse)
+			defer c.Unset()
 
 			req := httptest.NewRequest(http.MethodPut, URL, bytes.NewReader(Body))
 			req.Header["Content-Type"] = []string{"application/json"}
@@ -250,15 +312,13 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// override authz for test
-			authz.GivenPermissions = test.Permissions
+			authz.Access = test.Access
 
 			mux.ServeHTTP(w, req)
 			res := w.Result()
 			defer res.Body.Close()
 
 			require.Equal(t, test.ExpectedResponseStatusCode, w.Code, URL, BodyStringer{res.Body})
-
-			c.Unset() // unset custom response here
 		})
 	}
 }
@@ -267,7 +327,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 	mux := gmux.NewRouter()
 
 	sclient := NewMockSecrets()
-	authz := MockAuthorization{GivenPermissions: auth.Permission{}}
+	authz := MockAuthorization{Access: false}
 	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1), sclient, &authz)
 
 	for _, test := range []struct {
@@ -275,7 +335,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 		Workspace                  string
 		Body                       []byte
 		Key                        string
-		Permissions                auth.Permission
+		Access                     bool
 		ExpectedResponseStatusCode int
 		SecretClientError          error
 	}{
@@ -283,14 +343,14 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 			Name:                       "delete secret passing",
 			Workspace:                  "mock",
 			Key:                        "s2",
-			Permissions:                auth.Permission{Delete: true},
+			Access:                     true,
 			ExpectedResponseStatusCode: http.StatusNoContent,
 		},
 		{
 			Name:                       "delete secret no auth",
 			Workspace:                  "mock",
 			Key:                        "s2",
-			Permissions:                auth.Permission{Delete: false},
+			Access:                     false,
 			ExpectedResponseStatusCode: http.StatusUnauthorized,
 		},
 
@@ -298,7 +358,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 			Name:                       "delete secret client not found",
 			Workspace:                  "mock",
 			Key:                        "s2",
-			Permissions:                auth.Permission{Delete: true},
+			Access:                     true,
 			ExpectedResponseStatusCode: http.StatusNotFound,
 			SecretClientError:          k8serrors.NewNotFound(schema.GroupResource{}, "mock"),
 		},
@@ -306,7 +366,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 			Name:                       "delete secret client fail",
 			Workspace:                  "mock",
 			Key:                        "s2",
-			Permissions:                auth.Permission{Delete: true},
+			Access:                     true,
 			ExpectedResponseStatusCode: http.StatusInternalServerError,
 			SecretClientError:          errors.Errorf("could not delete secret %s", "mock"),
 		},
@@ -316,6 +376,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 
 			// add a custom response to secret client
 			c := sclient.On("DeleteSecretKey", mock.Anything, mock.Anything, mock.Anything).Return(test.SecretClientError)
+			defer c.Unset() // unset custom response at scope end
 
 			req := httptest.NewRequest(http.MethodDelete, URL, nil)
 			req.Header["Content-Type"] = []string{"application/json"}
@@ -323,7 +384,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// override authz for test
-			authz.GivenPermissions = test.Permissions
+			authz.Access = test.Access
 
 			mux.ServeHTTP(w, req)
 			res := w.Result()
@@ -331,7 +392,6 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 
 			require.Equal(t, test.ExpectedResponseStatusCode, w.Code, URL, BodyStringer{res.Body})
 
-			c.Unset() // unset custom response here
 		})
 	}
 }
