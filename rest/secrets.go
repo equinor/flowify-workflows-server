@@ -22,7 +22,7 @@ func AuthorizationDenied(w http.ResponseWriter, r *http.Request, err error) {
 	WriteErrorResponse(w, APIError{http.StatusUnauthorized, "Authorization Denied", err.Error()}, "authz middleware")
 }
 
-func PathAuthorization(subject string, action string, path string, req auth.Permission, authz auth.AuthorizationClient, next http.HandlerFunc) http.HandlerFunc {
+func PathAuthorization(subject auth.Subject, action auth.Action, path string, authz auth.AuthorizationClient, next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pathValue, exists := mux.Vars(r)[path]
 		if !exists {
@@ -32,7 +32,7 @@ func PathAuthorization(subject string, action string, path string, req auth.Perm
 
 		user := user.GetUser(r.Context())
 
-		if allow, err := authz.Authorize(subject, action, req, user, pathValue); err != nil || !allow {
+		if allow, err := authz.Authorize(subject, action, user, pathValue); err != nil || !allow {
 			if err == nil {
 				err = fmt.Errorf("not authorized")
 			}
@@ -56,10 +56,12 @@ func RegisterSecretRoutes(r *mux.Route, sclient secret.SecretClient, authz auth.
 	s.Use(CheckAcceptRequestHeaderMiddleware(outtype))
 	s.Use(SetContentTypeMiddleware(outtype))
 
-	//	s.HandleFunc("/secrets/{workspace}/", SecretListHandler(secretClient)).Methods(http.MethodGet)
-	s.HandleFunc("/secrets/{workspace}/", PathAuthorization("secrets", "list", "workspace", auth.Permission{Read: true}, authz, SecretListHandler(sclient))).Methods(http.MethodGet)
-	s.HandleFunc("/secrets/{workspace}/{key}", PathAuthorization("secrets", "write", "workspace", auth.Permission{Write: true}, authz, SecretPutHandler(sclient))).Methods(http.MethodPut)
-	s.HandleFunc("/secrets/{workspace}/{key}", PathAuthorization("secrets", "delete", "workspace", auth.Permission{Delete: true}, authz, SecretDeleteHandler(sclient))).Methods(http.MethodDelete)
+	/*
+		Authorization for secrets is done on path-variable level (workspace)
+	*/
+	s.HandleFunc("/secrets/{workspace}/", PathAuthorization(auth.Secrets, auth.List, "workspace", authz, SecretListHandler(sclient))).Methods(http.MethodGet)
+	s.HandleFunc("/secrets/{workspace}/{key}", PathAuthorization(auth.Secrets, auth.Write, "workspace", authz, SecretPutHandler(sclient))).Methods(http.MethodPut)
+	s.HandleFunc("/secrets/{workspace}/{key}", PathAuthorization(auth.Secrets, auth.Delete, "workspace", authz, SecretDeleteHandler(sclient))).Methods(http.MethodDelete)
 	// no get handler, secrets not readable
 	// s.HandleFunc("/secrets/{workspace}/{key}", SecretGetHandler(secretClient)).Methods(http.MethodGet)
 }
