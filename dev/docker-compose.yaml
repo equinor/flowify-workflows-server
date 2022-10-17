@@ -57,7 +57,7 @@ services:
       - FLOWIFY_DB_CONFIG_PORT=27017
       - FLOWIFY_SERVER_PORT=8842
       - FLOWIFY_KUBERNETES_NAMESPACE=argo
-      - FLOWIFY_KUBERNETES_KUBECONFIG=/root/.kube/config
+      - FLOWIFY_KUBERNETES_KUBECONFIGPATH=/root/.kube/config
       - KUBECONFIG=/root/.kube/config
       - FLOWIFY_AUTH_HANDLER=azure-oauth2-openid-token
       - FLOWIFY_AUTH_CONFIG_ISSUER=sandbox
