@@ -70,6 +70,7 @@ const (
 		"node": {
 		  "uid": "192161d7-e3f2-4991-adc0-a99c88c144c2",
 		  "description": "G2",
+		  "modifiedBy" : { "oid": "null", "email": "test@test.ts" },
 		  "inputs": [],
 		  "outputs": [],
 		  "type": "component",
@@ -192,6 +193,7 @@ const (
 		"node": {
 		  "uid": "192161d7-e3f2-4991-adc0-a99c88c144c2",
 		  "description": "G2",
+		  "modifiedBy" : { "oid": "null", "email": "test@test.ts" },
 		  "inputs": [],
 		  "outputs": [],
 		  "type": "component",

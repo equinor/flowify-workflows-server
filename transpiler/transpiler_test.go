@@ -26,6 +26,7 @@ const (
 		"component": {
 			"uid": "192161d7-e3f2-4991-adc0-a99c88c144c0",
 			"description": "My cool workflow",
+			"modifiedBy" : { "oid": "null", "email": "test@test.ts" },
 			"inputs": [
 				{ "name": "seedT", "mediatype": ["integer"], "type": "parameter" },
 				{ "name": "secretWF1", "mediatype": ["string"], "type": "env_secret" },
