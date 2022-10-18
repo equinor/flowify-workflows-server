@@ -37,7 +37,7 @@ var backoff = wait.Backoff{
 var CommitSHA = "unknown"
 var BuildTime = "unknown"
 
-const ApiV1 string = "/api/v1"
+const ApiV1Path string = "/api/v1"
 
 type flowifyServer struct {
 	k8Client      kubernetes.Interface
@@ -237,7 +237,7 @@ func SetCustomHeaders(next http.Handler) http.Handler {
 
 func (fs *flowifyServer) registerApplicationRoutes(router *gmux.Router) {
 	// send a pathprefix that catches all and handle in a subrouter to avoid interference
-	rest.RegisterRoutes(router.PathPrefix(ApiV1), fs.nodeStorage, fs.volumeStorage, fs.secrets, fs.wfClient, fs.k8Client, fs.auth, fs.authz, fs.workspace)
+	rest.RegisterRoutes(router.PathPrefix(ApiV1Path), fs.nodeStorage, fs.volumeStorage, fs.secrets, fs.wfClient, fs.k8Client, fs.auth, fs.authz, fs.workspace)
 
 	router.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "alive") }).Methods(http.MethodGet)
 	router.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "ready") }).Methods(http.MethodGet)

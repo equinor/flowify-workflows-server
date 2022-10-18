@@ -219,12 +219,17 @@ func (ws Workspace) UserHasAccess(user userpkg.User) bool {
 	return false
 }
 
+func AdminRole(userrole userpkg.Role) userpkg.Role {
+	const adminSuffix string = "-admin"
+	return userpkg.Role(userrole + userpkg.Role(adminSuffix))
+}
+
 func (ws Workspace) UserHasAdminAccess(user userpkg.User) bool {
 	for _, rs := range ws.Roles {
 		// rs is a list of roles of which the user has to fulfill all of to gain access
 		var userHasRole bool
 		for _, r := range rs {
-			userHasRole = userpkg.UserHasRole(user, userpkg.Role(r+"-admin"))
+			userHasRole = userpkg.UserHasRole(user, AdminRole(r))
 			if !userHasRole {
 				// missing a role, stop investigating current list
 				break

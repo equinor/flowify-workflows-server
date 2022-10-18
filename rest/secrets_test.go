@@ -158,7 +158,7 @@ func Test_ListSecretsHTTPHandler(t *testing.T) {
 
 	authz := MockAuthorization{Access: false}
 
-	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1), sclient, &authz)
+	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1Path), sclient, &authz)
 
 	type ClientResponse struct {
 		Keys  []string
@@ -194,8 +194,8 @@ func Test_ListSecretsHTTPHandler(t *testing.T) {
 		},
 	} {
 		t.Run(test.Name, func(t *testing.T) {
-			URL := path.Join(apiserver.ApiV1, "secrets", test.Workspace) + "/" // need explicit trailing
-			req := httptest.NewRequest(http.MethodGet, URL, nil)               /*bytes.NewReader(test.Body)*/
+			URL := path.Join(apiserver.ApiV1Path, "secrets", test.Workspace) + "/" // need explicit trailing
+			req := httptest.NewRequest(http.MethodGet, URL, nil)                   /*bytes.NewReader(test.Body)*/
 			req.Header["Content-Type"] = []string{"application/json"}
 			req = gmux.SetURLVars(req, map[string]string{"workspace": test.Workspace})
 			w := httptest.NewRecorder()
@@ -222,7 +222,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 	sclient.On("ListAvailableKeys", mock.Anything, mock.Anything).Return([]string{"s1", "s3"}, nil)
 
 	authz := MockAuthorization{Access: false}
-	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1), sclient, &authz)
+	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1Path), sclient, &authz)
 
 	for _, test := range []struct {
 		Name                       string
@@ -295,7 +295,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 		},
 	} {
 		t.Run(test.Name, func(t *testing.T) {
-			URL := path.Join(apiserver.ApiV1, "secrets", test.Workspace, test.Key) // no trailing on singular objs
+			URL := path.Join(apiserver.ApiV1Path, "secrets", test.Workspace, test.Key) // no trailing on singular objs
 			var Body []byte
 			if test.Body == nil {
 				body, err := json.Marshal(test.Secret)
@@ -331,7 +331,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 
 	sclient := NewMockSecrets()
 	authz := MockAuthorization{Access: false}
-	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1), sclient, &authz)
+	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1Path), sclient, &authz)
 
 	for _, test := range []struct {
 		Name                       string
@@ -375,7 +375,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 		},
 	} {
 		t.Run(test.Name, func(t *testing.T) {
-			URL := path.Join(apiserver.ApiV1, "secrets", test.Workspace, test.Key) // no trailing on singular objs
+			URL := path.Join(apiserver.ApiV1Path, "secrets", test.Workspace, test.Key) // no trailing on singular objs
 
 			// add a custom response to secret client
 			c := sclient.On("DeleteSecretKey", mock.Anything, mock.Anything, mock.Anything).Return(test.SecretClientError)
