@@ -29,32 +29,6 @@ const (
 	AuthorizationKey ContextKey = iota
 )
 
-type Permission struct {
-	Read    bool
-	Write   bool
-	Delete  bool
-	Execute bool
-}
-
-// Compares two permissions ('req', 'given') to see if 'given' has (at least) the required permissions
-func HasPermission(req Permission, given Permission) bool {
-	if req.Read && !given.Read {
-		return false
-	}
-	if req.Write && !given.Write {
-		return false
-	}
-	if req.Delete && !given.Delete {
-		return false
-	}
-	if req.Execute && !given.Execute {
-		return false
-	}
-	return true
-}
-
-type AuthorizeFunc = func(user user.User, obj string) (Permission, error)
-
 type Authorization struct {
 	Action     string
 	Authorized bool
