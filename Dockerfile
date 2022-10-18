@@ -10,8 +10,8 @@ WORKDIR $GOPATH/src/github.com/equinor/flowify-workflows-server
 # We should tighten this up
 COPY . .
 
-ARG GIT_COMMIT
-RUN make strip=1 flowify_git_sha=${GIT_COMMIT}
+ARG FLOWIFY_GIT_SHA
+RUN make strip=1 flowify_git_sha=${FLOWIFY_GIT_SHA}
 
 FROM builder as tester
 RUN go install github.com/jstemmer/go-junit-report@v0.9.1
