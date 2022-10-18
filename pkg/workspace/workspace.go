@@ -219,6 +219,28 @@ func (ws Workspace) UserHasAccess(user userpkg.User) bool {
 	return false
 }
 
+func (ws Workspace) UserHasAdminAccess(user userpkg.User) bool {
+	for _, rs := range ws.Roles {
+		// rs is a list of roles of which the user has to fulfill all of to gain access
+		var userHasRole bool
+		for _, r := range rs {
+			userHasRole = userpkg.UserHasRole(user, userpkg.Role(r+"-admin"))
+			if !userHasRole {
+				// missing a role, stop investigating current list
+				break
+			}
+		}
+
+		if !userHasRole {
+			// missing at least one role in current list, continue with next list
+			continue
+		}
+		// passed a complete list of necessary roles, success
+		return true
+	}
+	return false
+}
+
 func getAccessTokens(cm *core.ConfigMap) ([][]userpkg.Role, error) {
 	roleString := cm.Data[RolesKey]
 

@@ -2,6 +2,7 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/pkg/secret"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/storage"
+	"github.com/equinor/flowify-workflows-server/user"
 	userpkg "github.com/equinor/flowify-workflows-server/user"
 
 	"github.com/gorilla/mux"
@@ -193,5 +195,30 @@ func NewAuthenticationMiddleware(sec auth.AuthenticationClient) mux.MiddlewareFu
 			// continue with authenticated context
 			next.ServeHTTP(w, r.WithContext(userpkg.UserContext(user, r.Context())))
 		})
+	}
+}
+
+// This injects the workspace into the context and can be used to authorize users further down the stack
+func NewAuthorizationContext(wsclient workspace.WorkspaceClient) mux.MiddlewareFunc {
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ws, err := wsclient.ListWorkspaces(r.Context(), user.GetUser(r.Context()))
+			if err != nil {
+				WriteErrorResponse(w, APIError{http.StatusInternalServerError, "error retrieving component", err.Error()}, "authzmiddleware")
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), workspace.WorkspaceKey, ws)))
+		})
+	}
+}
+
+func GetWorkspaceAccess(ctx context.Context) []workspace.Workspace {
+	val := ctx.Value(workspace.WorkspaceKey)
+
+	if val == nil {
+		return []workspace.Workspace{}
+	} else {
+		return val.([]workspace.Workspace)
 	}
 }
