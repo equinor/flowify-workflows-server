@@ -2,6 +2,7 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,8 +12,10 @@ import (
 	argoclient "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/models"
+	"github.com/equinor/flowify-workflows-server/pkg/secret"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/storage"
+	"github.com/equinor/flowify-workflows-server/user"
 	userpkg "github.com/equinor/flowify-workflows-server/user"
 
 	"github.com/gorilla/mux"
@@ -97,7 +100,16 @@ func WriteErrorResponse(w http.ResponseWriter, apierr APIError, tag string) {
 	WriteResponse(w, apierr.Code, nil, apierr, tag)
 }
 
-func RegisterRoutes(r *mux.Route, componentClient storage.ComponentClient, volumeClient storage.VolumeClient, argoclient argoclient.Interface, k8sclient kubernetes.Interface, sec auth.AuthClient, wsclient workspace.WorkspaceClient) {
+func RegisterRoutes(r *mux.Route,
+	componentClient storage.ComponentClient,
+	volumeClient storage.VolumeClient,
+	secretClient secret.SecretClient,
+	argoclient argoclient.Interface,
+	k8sclient kubernetes.Interface,
+	sec auth.AuthenticationClient,
+	authz auth.AuthorizationClient,
+	wsclient workspace.WorkspaceClient) {
+
 	subrouter := r.Subrouter()
 
 	// require authenticated context
@@ -112,7 +124,7 @@ func RegisterRoutes(r *mux.Route, componentClient storage.ComponentClient, volum
 	// the following handlers below will use the authorized context's WorkspaceAccess
 	RegisterWorkflowRoutes(subrouter.PathPrefix(""), componentClient)
 	RegisterJobRoutes(subrouter.PathPrefix(""), componentClient, argoclient)
-	RegisterSecretRoutes(subrouter.PathPrefix(""), k8sclient)
+	RegisterSecretRoutes(subrouter.PathPrefix(""), secretClient, authz)
 	RegisterVolumeRoutes(subrouter.PathPrefix(""), volumeClient)
 
 }
@@ -171,7 +183,7 @@ func CheckAcceptRequestHeaderMiddleware(mediatype string) func(http.Handler) htt
 }
 
 // This ensures that the context is authenticated, with the appropriate User-tokens
-func NewAuthenticationMiddleware(sec auth.AuthClient) mux.MiddlewareFunc {
+func NewAuthenticationMiddleware(sec auth.AuthenticationClient) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user, err := sec.Authenticate(r)
@@ -183,5 +195,30 @@ func NewAuthenticationMiddleware(sec auth.AuthClient) mux.MiddlewareFunc {
 			// continue with authenticated context
 			next.ServeHTTP(w, r.WithContext(userpkg.UserContext(user, r.Context())))
 		})
+	}
+}
+
+// This injects the workspace into the context and can be used to authorize users further down the stack
+func NewAuthorizationContext(wsclient workspace.WorkspaceClient) mux.MiddlewareFunc {
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ws, err := wsclient.ListWorkspaces(r.Context(), user.GetUser(r.Context()))
+			if err != nil {
+				WriteErrorResponse(w, APIError{http.StatusInternalServerError, "error retrieving component", err.Error()}, "authzmiddleware")
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), workspace.WorkspaceKey, ws)))
+		})
+	}
+}
+
+func GetWorkspaceAccess(ctx context.Context) []workspace.Workspace {
+	val := ctx.Value(workspace.WorkspaceKey)
+
+	if val == nil {
+		return []workspace.Workspace{}
+	} else {
+		return val.([]workspace.Workspace)
 	}
 }

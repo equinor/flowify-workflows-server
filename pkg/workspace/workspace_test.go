@@ -1,4 +1,4 @@
-package workspace
+package workspace_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/equinor/flowify-workflows-server/auth"
+	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/user"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -104,7 +105,7 @@ func init() {
 	log.SetOutput(ioutil.Discard)
 }
 
-func getClient() WorkspaceClient {
+func getClient() workspace.WorkspaceClient {
 	var cm1, cm2, descriptions core.ConfigMap
 
 	json.Unmarshal([]byte(ConfigMap1), &cm1)
@@ -113,7 +114,7 @@ func getClient() WorkspaceClient {
 
 	clientSet := fake.NewSimpleClientset(&cm1, &cm2, &descriptions)
 
-	return NewWorkspaceClient(clientSet, namespace)
+	return workspace.NewWorkspaceClient(clientSet, namespace)
 }
 
 func Test_WorkspaceClientListWorkspaces(t *testing.T) {
@@ -153,7 +154,7 @@ func Test_WorkspaceNoRoleConfigMap(t *testing.T) {
 	json.Unmarshal([]byte(ConfigMap1), &cm1)
 	json.Unmarshal([]byte(ConfigMap2), &cm2)
 
-	client := NewWorkspaceClient(fake.NewSimpleClientset(&cm1, &cm2), namespace)
+	client := workspace.NewWorkspaceClient(fake.NewSimpleClientset(&cm1, &cm2), namespace)
 
 	ws, err := client.ListWorkspaces(ctx, auth.AzureTokenUser{Roles: []user.Role{"token1", "token2"}})
 	require.NoError(t, err)

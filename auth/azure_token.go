@@ -64,7 +64,7 @@ type AzureTokenAuthenticator struct {
 func NewAzureTokenAuthenticator(KeyFunc AzureKeyFunc,
 	Audience string,
 	Issuer string,
-	Options AzureTokenAuthenticatorOptions) AuthClient {
+	Options AzureTokenAuthenticatorOptions) AuthenticationClient {
 
 	return AzureTokenAuthenticator{KeyFunc: KeyFunc,
 		Audience: Audience, Issuer: Issuer,

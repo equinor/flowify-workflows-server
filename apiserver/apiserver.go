@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/equinor/flowify-workflows-server/auth"
+	"github.com/equinor/flowify-workflows-server/pkg/secret"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/rest"
 	"github.com/equinor/flowify-workflows-server/storage"
@@ -36,6 +37,8 @@ var backoff = wait.Backoff{
 var CommitSHA = "unknown"
 var BuildTime = "unknown"
 
+const ApiV1Path string = "/api/v1"
+
 type flowifyServer struct {
 	k8Client      kubernetes.Interface
 	namespace     string
@@ -43,9 +46,11 @@ type flowifyServer struct {
 	nodeStorage   storage.ComponentClient
 	volumeStorage storage.VolumeClient
 	workspace     workspace.WorkspaceClient
+	secrets       secret.SecretClient
 	portnumber    int
 	HttpServer    *http.Server
-	auth          auth.AuthClient
+	auth          auth.AuthenticationClient
+	authz         auth.AuthorizationClient
 }
 
 func (f *flowifyServer) GetKubernetesClient() kubernetes.Interface {
@@ -85,11 +90,14 @@ func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
 	}
 
 	workspace := workspace.NewWorkspaceClient(kubeClient, cfg.KubernetesKonfig.Namespace)
+	secretClient := secret.NewSecretClient(kubeClient)
 
 	authClient, err := auth.NewAuthClientFromConfig(cfg.AuthConfig)
 	if err != nil {
 		return flowifyServer{}, errors.Wrap(err, "could not create auth")
 	}
+
+	authz := auth.RoleAuthorizer{Workspaces: workspace}
 
 	return flowifyServer{
 		k8Client:      kubeClient,
@@ -98,8 +106,10 @@ func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
 		nodeStorage:   nodeStorage,
 		volumeStorage: volumeStorage,
 		workspace:     workspace,
+		secrets:       secretClient,
 		portnumber:    cfg.ServerConfig.Port,
 		auth:          authClient,
+		authz:         authz,
 	}, nil
 }
 
@@ -109,8 +119,10 @@ func NewFlowifyServer(k8Client kubernetes.Interface,
 	nodeStorage storage.ComponentClient,
 	volumeStorage storage.VolumeClient,
 	portnumber int,
-	sec auth.AuthClient) (flowifyServer, error) {
+	sec auth.AuthenticationClient) (flowifyServer, error) {
 	workspace := workspace.NewWorkspaceClient(k8Client, namespace)
+	secretClient := secret.NewSecretClient(k8Client)
+	authz := auth.RoleAuthorizer{Workspaces: workspace}
 
 	return flowifyServer{
 		k8Client:      k8Client,
@@ -119,8 +131,10 @@ func NewFlowifyServer(k8Client kubernetes.Interface,
 		nodeStorage:   nodeStorage,
 		volumeStorage: volumeStorage,
 		workspace:     workspace,
+		secrets:       secretClient,
 		portnumber:    portnumber,
 		auth:          sec,
+		authz:         authz,
 	}, nil
 }
 
@@ -223,7 +237,7 @@ func SetCustomHeaders(next http.Handler) http.Handler {
 
 func (fs *flowifyServer) registerApplicationRoutes(router *gmux.Router) {
 	// send a pathprefix that catches all and handle in a subrouter to avoid interference
-	rest.RegisterRoutes(router.PathPrefix("/api/v1"), fs.nodeStorage, fs.volumeStorage, fs.wfClient, fs.k8Client, fs.auth, fs.workspace)
+	rest.RegisterRoutes(router.PathPrefix(ApiV1Path), fs.nodeStorage, fs.volumeStorage, fs.secrets, fs.wfClient, fs.k8Client, fs.auth, fs.authz, fs.workspace)
 
 	router.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "alive") }).Methods(http.MethodGet)
 	router.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "ready") }).Methods(http.MethodGet)
@@ -243,8 +257,6 @@ func (fs *flowifyServer) registerApplicationRoutes(router *gmux.Router) {
 	})
 }
 
-// newHTTPServer returns the HTTP server to serve HTTP/HTTPS requests. This is implemented
-// using grpc-gateway as a proxy to the gRPC server.
 func (fs *flowifyServer) newHTTPServer(ctx context.Context, port int) *http.Server {
 	endpoint := fmt.Sprintf("localhost:%d", port)
 

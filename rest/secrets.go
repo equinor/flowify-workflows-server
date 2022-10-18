@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/pkg/secret"
+	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/kubernetes"
 )
 
 type SecretField struct {
@@ -17,21 +19,55 @@ type SecretField struct {
 	Value string `json:"value"`
 }
 
-func RegisterSecretRoutes(r *mux.Route, k8sinterface kubernetes.Interface) {
+func AuthorizationDenied(w http.ResponseWriter, r *http.Request, err error) {
+	WriteErrorResponse(w, APIError{http.StatusUnauthorized, "Authorization Denied", err.Error()}, "authz middleware")
+}
+
+func SecretsPathAuthorization(action auth.Action, authz auth.AuthorizationClient, next http.HandlerFunc) http.HandlerFunc {
+	return PathAuthorization(auth.Secrets, action, "workspace", authz, next)
+}
+
+func PathAuthorization(subject auth.Subject, action auth.Action, pathVariableName string, authz auth.AuthorizationClient, next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pathVariable, exists := mux.Vars(r)[pathVariableName]
+		if !exists {
+			AuthorizationDenied(w, r, fmt.Errorf("bad request"))
+			return
+		}
+
+		user := user.GetUser(r.Context())
+
+		if allow, err := authz.Authorize(subject, action, user, pathVariable); err != nil || !allow {
+			if err == nil {
+				err = fmt.Errorf("not authorized")
+			}
+			logrus.Info("Authorization denied: ", subject, action, user, pathVariable)
+			AuthorizationDenied(w, r, err)
+			return
+		}
+
+		next(w, r)
+
+	})
+}
+
+func RegisterSecretRoutes(r *mux.Route, sclient secret.SecretClient, authz auth.AuthorizationClient) {
+
 	s := r.Subrouter()
 
 	const intype = "application/json"
 	const outtype = "application/json"
 
-	secretClient := secret.NewSecretClient(k8sinterface)
-
 	s.Use(CheckContentHeaderMiddleware(intype))
 	s.Use(CheckAcceptRequestHeaderMiddleware(outtype))
 	s.Use(SetContentTypeMiddleware(outtype))
 
-	s.HandleFunc("/secrets/{workspace}/", SecretListHandler(secretClient)).Methods(http.MethodGet)
-	s.HandleFunc("/secrets/{workspace}/{key}", SecretPutHandler(secretClient)).Methods(http.MethodPut)
-	s.HandleFunc("/secrets/{workspace}/{key}", SecretDeleteHandler(secretClient)).Methods(http.MethodGet)
+	/*
+		Authorization for secrets is done on path-variable level {workspace}
+	*/
+	s.HandleFunc("/secrets/{workspace}/", SecretsPathAuthorization(auth.List, authz, SecretListHandler(sclient))).Methods(http.MethodGet)
+	s.HandleFunc("/secrets/{workspace}/{key}", SecretsPathAuthorization(auth.Write, authz, SecretPutHandler(sclient))).Methods(http.MethodPut)
+	s.HandleFunc("/secrets/{workspace}/{key}", SecretsPathAuthorization(auth.Delete, authz, SecretDeleteHandler(sclient))).Methods(http.MethodDelete)
 	// no get handler, secrets not readable
 	// s.HandleFunc("/secrets/{workspace}/{key}", SecretGetHandler(secretClient)).Methods(http.MethodGet)
 }
