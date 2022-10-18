@@ -200,7 +200,6 @@ func logHTTPRequest(r *http.Request, start time.Time, ignoreList []string) {
 	}
 
 	log.Infof("origin: %s\trequest: %s %s %s\tspan: %s", origin, r.Method, r.URL, r.Proto, time.Since(start))
-	log.Info("Request Headers: ", r.Header)
 }
 
 func LogRequestMiddleware(next http.Handler) http.Handler {
