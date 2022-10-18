@@ -19,7 +19,8 @@ metadata:
     name: "sandbox-project-b"
     namespace: "argo"
 data:
-    roles: "[\"sandbox-admin\"]"
+    roles: "[[\"sandbox\"]]"
+
 ---
 apiVersion: v1
 kind: ConfigMap

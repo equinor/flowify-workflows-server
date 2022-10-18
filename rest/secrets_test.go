@@ -123,7 +123,9 @@ func Test_PathAuthorization(t *testing.T) {
 		WorkspacePath  *url.URL
 		ExpectedResult int
 	}
-
+	/*
+	   These test make sure the handling of the url path variable works as expected
+	*/
 	for _, test := range []test{
 		{
 			Name:           "no workspace var in request",
@@ -131,7 +133,8 @@ func Test_PathAuthorization(t *testing.T) {
 			ExpectedResult: http.StatusUnauthorized,
 		},
 		{
-			Name:           "with workspace",
+			Name: "with workspace var in request",
+			// its a path variable, so any string matching the position will enable the variable to be read by the handler
 			WorkspacePath:  first(url.Parse("/workspace-name/")),
 			ExpectedResult: http.StatusOK,
 		},

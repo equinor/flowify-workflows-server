@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/pkg/errors"
 )
@@ -76,6 +77,7 @@ type AuthorizationClient interface {
 
 type RoleAuthorizer struct {
 	// map subject -> action -> required permssion
+	Workspaces workspace.WorkspaceClient
 }
 
 type Action string
@@ -93,6 +95,21 @@ const (
 	Secrets Subject = "secrets"
 )
 
+func (ra RoleAuthorizer) GetWorkspacePermissions(wsp string, usr user.User) (bool, bool, error) {
+	wss, err := ra.Workspaces.ListWorkspaces(context.TODO(), usr)
+	if err != nil {
+		return false, false, errors.Wrap(err, "could not get workspace permissions")
+	}
+
+	for _, ws := range wss {
+		if ws.Name == wsp {
+			return ws.UserHasAccess(usr), ws.UserHasAdminAccess(usr), nil
+		}
+	}
+
+	return false, false, nil
+}
+
 func (ra RoleAuthorizer) GetSecretPermissions(usr user.User, data any) (map[Action]bool, error) {
 	p := make(map[Action]bool)
 
@@ -101,13 +118,16 @@ func (ra RoleAuthorizer) GetSecretPermissions(usr user.User, data any) (map[Acti
 		return map[Action]bool{}, errors.Errorf("could not decode the workspace variable")
 	}
 
-	p[Read] = user.UserHasRole(usr, user.Role(workspace)) ||
-		user.UserHasRole(usr, user.Role(workspace+"-admin")) ||
-		user.UserHasRole(usr, user.Role("admin"))
-	p[List] = p[Read]
-	p[Write] = user.UserHasRole(usr, user.Role(workspace+"-admin")) ||
-		user.UserHasRole(usr, user.Role("admin"))
-	p[Delete] = p[Write]
+	userAccess, adminAccess, err := ra.GetWorkspacePermissions(workspace, usr)
+	if err != nil {
+		return map[Action]bool{}, errors.Wrap(err, "could not get secret permissions")
+	}
+
+	// this is where access levels map to actions.
+	p[Read] = userAccess || adminAccess
+	p[List] = userAccess || adminAccess
+	p[Write] = adminAccess
+	p[Delete] = adminAccess
 
 	return p, nil
 }

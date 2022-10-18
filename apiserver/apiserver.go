@@ -97,7 +97,7 @@ func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
 		return flowifyServer{}, errors.Wrap(err, "could not create auth")
 	}
 
-	authz := auth.RoleAuthorizer{}
+	authz := auth.RoleAuthorizer{Workspaces: workspace}
 
 	return flowifyServer{
 		k8Client:      kubeClient,
@@ -122,7 +122,7 @@ func NewFlowifyServer(k8Client kubernetes.Interface,
 	sec auth.AuthenticationClient) (flowifyServer, error) {
 	workspace := workspace.NewWorkspaceClient(k8Client, namespace)
 	secretClient := secret.NewSecretClient(k8Client)
-	authz := auth.RoleAuthorizer{}
+	authz := auth.RoleAuthorizer{Workspaces: workspace}
 
 	return flowifyServer{
 		k8Client:      k8Client,
