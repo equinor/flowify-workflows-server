@@ -41,7 +41,7 @@ ifdef UNITTEST_COVERAGE
 	rm -f pipe1
 	mkfifo pipe1
 	(tee testoutputs/unittest.log | go-junit-report > testoutputs/report.xml) < pipe1 &
-	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest` -covermode=count -coverprofile=coverage.out -ldflags "-X 'github.com/equinor/flowify-workflows-server/apiserver.CommitSHA=$(FLOWIFY_GIT_SHA)' -X 'github.com/equinor/flowify-workflows-server/apiserver.BuildTime=$(shell date -Is)'" 2>&1 -v > pipe1
+	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest` -covermode=count -coverprofile=coverage.out -ldflags "-X 'github.com/equinor/flowify-workflows-server/apiserver.CommitSHA=$(flowify_git_sha)' -X 'github.com/equinor/flowify-workflows-server/apiserver.BuildTime=$(shell date -Is)'" 2>&1 -v > pipe1
 	gcov2lcov -infile=coverage.out -outfile=testoutputs/coverage.lcov
 else
 	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest`
