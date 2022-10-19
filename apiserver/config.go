@@ -88,7 +88,7 @@ func viperDecodeHook() viper.DecoderConfigOption {
 					return data, nil
 				}
 				v, err := strconv.Atoi(data.(string))
-				fmt.Printf("Converting (%v, %v) %v => %d. (%v)\n", f, t, data, v, err)
+				//fmt.Printf("Converting (%v, %v) %v => %d. (%v)\n", f, t, data, v, err)
 				if err != nil {
 					return data, nil
 				}

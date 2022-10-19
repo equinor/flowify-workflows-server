@@ -1,0 +1,30 @@
+name: End-to-end test
+on:
+  workflow_dispatch: {}
+  push:
+    paths-ignore:
+      - ".github/**"
+      - "dev/**"
+jobs:
+  tests:
+    name: Run end-to-end tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Run try to build e2e-container
+        run: make docker_e2e_build flowify_git_sha=${{ github.sha }}
+      - name: Run tests and generate report
+        run: make docker_e2e_test flowify_git_sha=${{ github.sha }}
+      - name: Archive code test results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: report
+          path: testoutputs/e2ereport.xml
+      - name: Publish end-to-end test results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
+        with:
+          files: testoutputs/e2ereport.xml
+

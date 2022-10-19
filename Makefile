@@ -54,11 +54,10 @@ test: unittest e2etest
 
 # the docker tests run the unittests and e2etest in a dockerized environment
 
-# We build a container that has done the tests then pull out the files.
-# We should instead build a container then run the tests to an output.
-docker_test:
+docker_unittest:
 	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f docker-compose-tests.yaml build
 	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f docker-compose-tests.yaml up --exit-code-from app
+
 
 docker_e2e_build:
 # build base services
@@ -76,4 +75,4 @@ docker_e2e_test_run: docker_e2e_build
 	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml run --rm flowify-e2e-runner
 
 
-.PHONY: all server init clean test docker_test e2etest
+.PHONY: all server init clean test docker_unittest e2etest
