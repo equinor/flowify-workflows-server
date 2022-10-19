@@ -13,7 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Run try to build container
-        run: docker build --build-arg GIT_COMMIT=${{ github.sha }} .
+        run: docker build --build-arg FLOWIFY_GIT_SHA=${{ github.sha }} .
       - name: Run tests and generate report
         run: make docker_test
       - name: Upload coverage
