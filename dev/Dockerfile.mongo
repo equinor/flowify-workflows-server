@@ -1,0 +1,3 @@
+FROM mongo:5.0
+
+COPY ./dev/example_data/ .

@@ -51,3 +51,13 @@ jobs:
         tags: |
           ghcr.io/equinor/flowify-dev-builder:${{ env.SHORT_SHA}} 
           ghcr.io/equinor/flowify-dev-builder:latest
+
+    - name: Build and push docker image
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: ./dev/Dockerfile.mongo
+        push: true
+        tags: |
+          ghcr.io/equinor/flowify-mongo:${{ env.SHORT_SHA}} 
+          ghcr.io/equinor/flowify-mongo:latest
