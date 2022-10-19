@@ -34,7 +34,7 @@ jobs:
             org.opencontainers.image.created=${{ env.DATE }}
             org.opencontainers.image.revision=${{ github.sha }}
           tags: auroradevacr.azurecr.io/flowify/flowify-workflows-server:${{ github.sha }}
-          build-args: GIT_COMMIT=${{ github.sha }}
+          build-args: FLOWIFY_GIT_SHA=${{ github.sha }}
           push: true
       - name: Logout from the container registry
         run: |
@@ -53,7 +53,7 @@ jobs:
             org.opencontainers.image.created=${{ env.DATE }}
             org.opencontainers.image.revision=${{ github.sha }}
           tags: auroraprodacr.azurecr.io/flowify/flowify-workflows-server:${{ github.sha }}
-          build-args: GIT_COMMIT=${{ github.sha }}
+          build-args: FLOWIFY_GIT_SHA=${{ github.sha }}
           push: true
       - name: Logout from the container registry
         run: |
