@@ -1,0 +1,53 @@
+name: Build public dev docker images to ghcr  
+ 
+on: 
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '.github/**'
+
+permissions:
+      id-token: write
+      contents: read
+      packages: write
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Checkout branch
+      uses: actions/checkout@v1
+
+    - name: Set image tag and short sha
+      run: |
+        echo "DOCKER_IMG_VERSION=$(cat ./aim/version.txt)" >> $GITHUB_ENV
+        echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+    - name: GitHub Container Registry login
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Initialize BuildX
+      uses: docker/setup-buildx-action@v1
+
+    - name: Build and push docker image (for k8s deploy)
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: |
+          ghcr.io/equinor/flowify-workflows-server:sha-${{ env.SHORT_SHA}}
+          ghcr.io/equinor/flowify-workflows-server:dev
+
+    - name: Build and push docker image (for local run)
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: ./dev/Dockerfile.server
+        push: true
+        tags: |
+          ghcr.io/equinor/flowify-workflows-server-local:sha-${{ env.SHORT_SHA}}
+          ghcr.io/equinor/flowify-workflows-server-local:dev
