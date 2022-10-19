@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"expireAt":{"$numberInt":"1"}},"name":"TenantMigrationDonorTTLIndex","expireAfterSeconds":{"$numberInt":"0"}}],"uuid":"ad328b28de834e40900968113dea9e2d","collectionName":"tenantMigrationDonors","type":"collection"}
