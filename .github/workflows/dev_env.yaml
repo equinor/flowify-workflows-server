@@ -32,7 +32,7 @@ jobs:
     - name: Initialize BuildX
       uses: docker/setup-buildx-action@v1
 
-    - name: Build and push docker image
+    - name: Build and push kind cluster image
       uses: docker/build-push-action@v2
       with:
         context: .
@@ -42,7 +42,7 @@ jobs:
           ghcr.io/equinor/flowify-dev-cluster:${{ env.SHORT_SHA}} 
           ghcr.io/equinor/flowify-dev-cluster:latest
 
-    - name: Build and push docker image
+    - name: Build and push dev env builder image
       uses: docker/build-push-action@v2
       with:
         context: .
@@ -52,7 +52,7 @@ jobs:
           ghcr.io/equinor/flowify-dev-builder:${{ env.SHORT_SHA}} 
           ghcr.io/equinor/flowify-dev-builder:latest
 
-    - name: Build and push docker image
+    - name: Build and push mongo image
       uses: docker/build-push-action@v2
       with:
         context: .
