@@ -33,6 +33,20 @@ The following services will be available at:
 | Flowify server      | 8842       |
 | MongoDB   | 27017        |
 
+To Get cluster contrainer IP Address:
+
+`docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster-control-plane`
+
+Load kubeconfig from host machine
+
+`docker exec cluster-control-plane cat /etc/kubernetes/admin.conf | sed "s/cluster-control-plane/$KUBERNETES_SERVICE_HOST/g" > ~/.kube/config`
+
+Load example database to mongoDB
+```bash
+docker cp ./dev/example_data mongo_server:/
+docker exec mongo_server mongorestore dump
+```
+
 ### Optional: To start an developer instance of the Frontend:
 
 Set the following dummy JWT token as environmental variable on your local host
