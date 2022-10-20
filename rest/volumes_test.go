@@ -1,23 +1,20 @@
-package rest_test
+package rest
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"path"
 	"testing"
 
-	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/models"
-	"github.com/equinor/flowify-workflows-server/rest"
 	"github.com/equinor/flowify-workflows-server/storage"
-	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/google/uuid"
 	gmux "github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -123,6 +120,7 @@ func Test_ListVolumesHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 			mux.ServeHTTP(w, request)
 			res := w.Result()
+
 			defer res.Body.Close()
 
 			require.Equal(t, test.Code, res.StatusCode, BodyStringer{res.Body})
@@ -354,6 +352,7 @@ func Test_DeleteVolumeHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 			mux.ServeHTTP(w, request)
 			res := w.Result()
+
 			defer res.Body.Close()
 
 			require.Equal(t, test.Code, res.StatusCode, BodyStringer{res.Body})

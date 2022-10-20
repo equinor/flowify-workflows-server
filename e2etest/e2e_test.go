@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -341,7 +341,7 @@ func (s *e2eTestSuite) Test_Roundtrip_Component() {
 
 	requestor := make_authenticated_requestor(s.client, mockUser)
 
-	cmp1, err := ioutil.ReadFile("../models/examples/minimal-any-component.json")
+	cmp1, err := os.ReadFile("../models/examples/minimal-any-component.json")
 	s.NoError(err)
 	cmpReq := fmt.Sprintf(`
 	{
@@ -371,7 +371,7 @@ func (s *e2eTestSuite) Test_Roundtrip_Component() {
 func (s *e2eTestSuite) Test_Roundtrip_Workflow() {
 	requestor := make_authenticated_requestor(s.client, mockUser)
 
-	data, _ := ioutil.ReadFile("../models/examples/minimal-any-workflow.json")
+	data, _ := os.ReadFile("../models/examples/minimal-any-workflow.json")
 	wfReq := fmt.Sprintf(`
 	{
 		"options": {},
@@ -426,7 +426,7 @@ func ResponseBodyBytes(resp *http.Response) []byte {
 func (s *e2eTestSuite) Test_Roundtrip_Job() {
 	requestor := make_authenticated_requestor(s.client, mockUser)
 
-	data, _ := ioutil.ReadFile("../models/examples/job-example.json")
+	data, _ := os.ReadFile("../models/examples/job-example.json")
 	wfReq := fmt.Sprintf(`
 	{
 		"options": {},

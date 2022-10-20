@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/equinor/flowify-workflows-server/models"
@@ -27,7 +26,7 @@ func main() {
 		return
 	}
 
-	rawbytes, err := ioutil.ReadFile(flag.Arg(0))
+	rawbytes, err := os.ReadFile(flag.Arg(0))
 	if err != nil {
 		log.Fatal(err.Error())
 		return

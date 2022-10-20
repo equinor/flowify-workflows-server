@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -110,9 +110,9 @@ func main() {
 
 		var err error // nil error
 		if *fileName == "-" {
-			bytes, err = ioutil.ReadAll(bufio.NewReader(os.Stdin))
+			bytes, err = io.ReadAll(bufio.NewReader(os.Stdin))
 		} else {
-			bytes, err = ioutil.ReadFile(*fileName)
+			bytes, err = os.ReadFile(*fileName)
 		}
 		if err != nil {
 			panic(err)

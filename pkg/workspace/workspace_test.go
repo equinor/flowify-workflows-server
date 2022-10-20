@@ -3,13 +3,11 @@ package workspace_test
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"testing"
 
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/user"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -102,7 +100,7 @@ var (
 )
 
 func init() {
-	log.SetOutput(ioutil.Discard)
+
 }
 
 func getClient() workspace.WorkspaceClient {

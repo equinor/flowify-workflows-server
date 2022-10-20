@@ -411,3 +411,11 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 		})
 	}
 }
+
+func ReadType[T any](r *http.Response) (T, error) {
+	bytes := ResponseBodyBytes(r)
+	var item T
+
+	err := json.Unmarshal(bytes, &item)
+	return item, err
+}

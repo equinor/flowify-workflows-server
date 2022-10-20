@@ -16,7 +16,6 @@ import (
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/storage"
 	"github.com/equinor/flowify-workflows-server/user"
-	userpkg "github.com/equinor/flowify-workflows-server/user"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -209,14 +208,14 @@ func PathAuthorization(subject auth.Subject, action auth.Action, pathVariableNam
 func NewAuthenticationMiddleware(sec auth.AuthenticationClient) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user, err := sec.Authenticate(r)
+			usr, err := sec.Authenticate(r)
 			if err != nil {
 				WriteErrorResponse(w, APIError{http.StatusBadRequest, "could not authenticate", err.Error()}, "authmiddleware")
 				return
 			}
 
 			// continue with authenticated context
-			next.ServeHTTP(w, r.WithContext(userpkg.UserContext(user, r.Context())))
+			next.ServeHTTP(w, r.WithContext(user.UserContext(usr, r.Context())))
 		})
 	}
 }

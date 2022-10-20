@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"sigs.k8s.io/yaml"
@@ -32,7 +31,7 @@ func main() {
 		return
 	}
 
-	rawbytes, err := ioutil.ReadFile(flag.Arg(0))
+	rawbytes, err := os.ReadFile(flag.Arg(0))
 	if err != nil {
 		log.Fatal(err.Error())
 		return

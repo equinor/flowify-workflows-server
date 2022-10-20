@@ -5,9 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"testing"
 	"time"
@@ -33,18 +34,17 @@ import (
 )
 
 func init() {
-	// log.SetOutput(ioutil.Discard)
 }
 
 var (
-	cmp1, _ = ioutil.ReadFile("../models/examples/minimal-any-component.json")
+	cmp1, _ = os.ReadFile("../models/examples/minimal-any-component.json")
 	cmpReq  = []byte(fmt.Sprintf(`
 	{
 		"options": {},
 		"component": %s
 	}`, cmp1))
 
-	wf1, _ = ioutil.ReadFile("../models/examples/minimal-any-workflow.json")
+	wf1, _ = os.ReadFile("../models/examples/minimal-any-workflow.json")
 	wfReq  = []byte(fmt.Sprintf(`
 {
 	"options": {},
@@ -286,7 +286,7 @@ func Test_ComponentHTTPHandler(t *testing.T) {
 			res := w.Result()
 
 			defer res.Body.Close()
-			payload, err = ioutil.ReadAll(res.Body)
+			payload, err = io.ReadAll(res.Body)
 			require.NoError(t, err)
 			if test.ExpectedResponseStatusCode != http.StatusNoContent {
 				require.True(t, json.Valid(payload))
@@ -402,7 +402,7 @@ func Test_JobSubmitHTTPHandler(t *testing.T) {
 			res := w.Result()
 
 			defer res.Body.Close()
-			payload, err = ioutil.ReadAll(res.Body)
+			payload, err = io.ReadAll(res.Body)
 			require.NoError(t, err)
 			require.True(t, json.Valid(payload))
 
@@ -522,7 +522,7 @@ func Test_JobEventHTTPHandler(t *testing.T) {
 			require.Equal(t, "no-cache, no-store", res.Header["Cache-Control"][0])
 			require.Equal(t, "keep-alive", res.Header["Connection"][0])
 
-			payload, err = ioutil.ReadAll(res.Body)
+			payload, err = io.ReadAll(res.Body)
 			require.NoError(t, err)
 
 			messages := bytes.Split(payload, []byte("\n\n"))
@@ -570,7 +570,7 @@ func Test_JobDeleteHandler(t *testing.T) {
 			res := w.Result()
 
 			defer res.Body.Close()
-			payload, err = ioutil.ReadAll(res.Body)
+			payload, err = io.ReadAll(res.Body)
 			require.NoError(t, err)
 
 			if test.ExpectedResponseStatusCode == http.StatusOK {
@@ -626,7 +626,7 @@ func Test_WorkspacesHTTPHandler(t *testing.T) {
 			res := w.Result()
 
 			defer res.Body.Close()
-			payload, err = ioutil.ReadAll(res.Body)
+			payload, err = io.ReadAll(res.Body)
 			require.NoError(t, err)
 
 			type WorkspaceAccessList struct {
