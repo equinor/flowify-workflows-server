@@ -67,6 +67,7 @@ type Subject string
 
 const (
 	Secrets Subject = "secrets"
+	Volumes Subject = "volumes"
 )
 
 func (ra RoleAuthorizer) GetWorkspacePermissions(wsp string, usr user.User) (bool, bool, error) {

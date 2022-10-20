@@ -125,7 +125,7 @@ func RegisterRoutes(r *mux.Route,
 	RegisterWorkflowRoutes(subrouter.PathPrefix(""), componentClient)
 	RegisterJobRoutes(subrouter.PathPrefix(""), componentClient, argoclient)
 	RegisterSecretRoutes(subrouter.PathPrefix(""), secretClient, authz)
-	RegisterVolumeRoutes(subrouter.PathPrefix(""), volumeClient)
+	RegisterVolumeRoutes(subrouter.PathPrefix(""), volumeClient, authz)
 
 }
 
