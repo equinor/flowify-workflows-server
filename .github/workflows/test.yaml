@@ -1,4 +1,4 @@
-name: Test
+name: Unit tests
 on:
   workflow_dispatch: {}
   push:
@@ -7,7 +7,7 @@ on:
       - "dev/**"
 jobs:
   tests:
-    name: Run all tests
+    name: Run all unit tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -15,7 +15,7 @@ jobs:
       - name: Run try to build container
         run: docker build --build-arg FLOWIFY_GIT_SHA=${{ github.sha }} .
       - name: Run tests and generate report
-        run: make docker_test
+        run: make docker_unittest
       - name: Upload coverage
         uses: romeovs/lcov-reporter-action@v0.2.21
         if: always()

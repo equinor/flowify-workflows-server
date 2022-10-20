@@ -29,7 +29,11 @@ COPY go.sum .
 RUN go mod download
 ENV PATH="${PATH}:/root"
 
-FROM buildbase as devserver
+FROM buildbase as devbase
+RUN go install github.com/jstemmer/go-junit-report@latest
+RUN go install github.com/jandelgado/gcov2lcov@latest
+
+FROM devbase as devserver
 COPY apiserver ./apiserver
 COPY auth ./auth
 COPY cmd ./cmd
@@ -43,6 +47,8 @@ COPY config.yml .
 COPY main.go .
 COPY Makefile .
 COPY e2etest ./e2etest
+
+
 ARG FLOWIFY_GIT_SHA
 RUN ["/bin/bash", "-c", "make server strip=1 flowify_git_sha=${FLOWIFY_GIT_SHA}"]
 

@@ -11,6 +11,7 @@ services:
         - FLOWIFY_GIT_SHA=${FLOWIFY_GIT_SHA}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ../testoutputs:/go/src/github.com/equinor/flowify-workflows-server/testoutputs
     depends_on:
       cluster:
         condition: service_healthy

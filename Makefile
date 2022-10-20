@@ -33,16 +33,18 @@ clean:
 	@rm -rf docs/*.json
 	@rm -rf docs/*.yaml
 
+TEST_OUTPUT_DIR = ./testoutputs
 
 # exclude slow e2e tests depending on running server infrastructure
 # define the UNITTEST_COVERAGE variable to output coverage
 unittest:
 ifdef UNITTEST_COVERAGE
+	mkdir -p $(TEST_OUTPUT_DIR)
 	rm -f pipe1
 	mkfifo pipe1
-	(tee testoutputs/unittest.log | go-junit-report > testoutputs/report.xml) < pipe1 &
+	(tee $(TEST_OUTPUT_DIR)/unittest.log | go-junit-report > $(TEST_OUTPUT_DIR)/report.xml) < pipe1 &
 	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest` -covermode=count -coverprofile=coverage.out -ldflags "-X 'github.com/equinor/flowify-workflows-server/apiserver.CommitSHA=$(flowify_git_sha)' -X 'github.com/equinor/flowify-workflows-server/apiserver.BuildTime=$(shell date -Is)'" 2>&1 -v > pipe1
-	gcov2lcov -infile=coverage.out -outfile=testoutputs/coverage.lcov
+	gcov2lcov -infile=coverage.out -outfile=$(TEST_OUTPUT_DIR)/coverage.lcov
 else
 	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest`
 endif
@@ -54,11 +56,10 @@ test: unittest e2etest
 
 # the docker tests run the unittests and e2etest in a dockerized environment
 
-# We build a container that has done the tests then pull out the files.
-# We should instead build a container then run the tests to an output.
-docker_test:
+docker_unittest:
 	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f docker-compose-tests.yaml build
 	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f docker-compose-tests.yaml up --exit-code-from app
+
 
 docker_e2e_build:
 # build base services
@@ -76,4 +77,4 @@ docker_e2e_test_run: docker_e2e_build
 	FLOWIFY_GIT_SHA=$(flowify_git_sha) docker-compose -f dev/docker-compose.yaml -f dev/docker-compose-e2e.yaml run --rm flowify-e2e-runner
 
 
-.PHONY: all server init clean test docker_test e2etest
+.PHONY: all server init clean test docker_unittest e2etest
