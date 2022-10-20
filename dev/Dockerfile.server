@@ -30,8 +30,8 @@ RUN go mod download
 ENV PATH="${PATH}:/root"
 
 FROM buildbase as devbase
-RUN go install github.com/jstemmer/go-junit-report@v0.9.1
-RUN go install github.com/jandelgado/gcov2lcov@v1.0.5
+RUN go install github.com/jstemmer/go-junit-report@latest
+RUN go install github.com/jandelgado/gcov2lcov@latest
 
 FROM devbase as devserver
 COPY apiserver ./apiserver

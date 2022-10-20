@@ -33,16 +33,18 @@ clean:
 	@rm -rf docs/*.json
 	@rm -rf docs/*.yaml
 
+TEST_OUTPUT_DIR = ./testoutputs
 
 # exclude slow e2e tests depending on running server infrastructure
 # define the UNITTEST_COVERAGE variable to output coverage
 unittest:
 ifdef UNITTEST_COVERAGE
+	mkdir -p $(TEST_OUTPUT_DIR)
 	rm -f pipe1
 	mkfifo pipe1
-	(tee testoutputs/unittest.log | go-junit-report > testoutputs/report.xml) < pipe1 &
+	(tee $(TEST_OUTPUT_DIR)/unittest.log | go-junit-report > $(TEST_OUTPUT_DIR)/report.xml) < pipe1 &
 	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest` -covermode=count -coverprofile=coverage.out -ldflags "-X 'github.com/equinor/flowify-workflows-server/apiserver.CommitSHA=$(flowify_git_sha)' -X 'github.com/equinor/flowify-workflows-server/apiserver.BuildTime=$(shell date -Is)'" 2>&1 -v > pipe1
-	gcov2lcov -infile=coverage.out -outfile=testoutputs/coverage.lcov
+	gcov2lcov -infile=coverage.out -outfile=$(TEST_OUTPUT_DIR)/coverage.lcov
 else
 	go test $(UNITTEST_FLAGS) `go list ./... | grep -v e2etest`
 endif
