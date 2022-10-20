@@ -39,6 +39,11 @@ type Config struct {
 	ServerConfig ServerConfig `mapstructure:"server"`
 }
 
+type LoadOptions struct {
+	// whether loading a config should consider environment overloads or not, default is allow
+	DenyEnvironmentOverride bool
+}
+
 func (cfg Config) String() string {
 	bytes, err := yaml.Marshal(cfg)
 	if err != nil {
@@ -64,9 +69,11 @@ func (cfg Config) Dump(path string) error {
 	return nil
 }
 
-func viperConfig() {
+func viperConfig(allow_env_override bool) {
 	viper.SetConfigType("yaml")
-	viper.AutomaticEnv() // let env override config if available
+	if allow_env_override {
+		viper.AutomaticEnv() // let env override config if available
+	}
 
 	// to allow environment parse nested config
 	viper.SetEnvKeyReplacer(strings.NewReplacer(`.`, `_`))
@@ -88,7 +95,7 @@ func viperDecodeHook() viper.DecoderConfigOption {
 					return data, nil
 				}
 				v, err := strconv.Atoi(data.(string))
-				//fmt.Printf("Converting (%v, %v) %v => %d. (%v)\n", f, t, data, v, err)
+				fmt.Printf("Converting (%v, %v) %v => %d. (%v)\n", f, t, data, v, err)
 				if err != nil {
 					return data, nil
 				}
@@ -98,8 +105,8 @@ func viperDecodeHook() viper.DecoderConfigOption {
 	)
 }
 
-func LoadConfigFromReader(stream io.Reader) (Config, error) {
-	viperConfig()
+func LoadConfigFromReader(stream io.Reader, opts LoadOptions) (Config, error) {
+	viperConfig(!opts.DenyEnvironmentOverride)
 	config := Config{}
 	if err := viper.ReadConfig(stream); err != nil {
 		return Config{}, errors.Wrap(err, "Cannot load config from reader")
@@ -114,9 +121,9 @@ func LoadConfigFromReader(stream io.Reader) (Config, error) {
 
 }
 
-func LoadConfigFromPath(path string) (Config, error) {
+func LoadConfigFromPath(path string, opts LoadOptions) (Config, error) {
 	viper.AddConfigPath(path)
-	viperConfig()
+	viperConfig(opts.DenyEnvironmentOverride)
 
 	err := viper.ReadInConfig()
 	if err != nil {

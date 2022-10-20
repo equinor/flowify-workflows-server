@@ -1,18 +1,7 @@
 package test
 
-import (
-	"bytes"
-	"io"
-	//	flowifypkg "github.com/equinor/flowify-workflows-server/pkg/apiclient/interceptor"
-	//	"github.com/equinor/flowify-workflows-server/workflowserver"
-)
-
-func body2string(body io.ReadCloser) []byte {
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(body)
-
-	return buf.Bytes()
-}
+//	flowifypkg "github.com/equinor/flowify-workflows-server/pkg/apiclient/interceptor"
+//	"github.com/equinor/flowify-workflows-server/workflowserver"
 
 func wrap(workflowstring string) string {
 	return "{ \"template\":" + workflowstring + "}"

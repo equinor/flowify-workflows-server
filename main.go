@@ -35,14 +35,14 @@ func isFlagPassed(name string) bool {
 	return found
 }
 
-func first[T any, S any](t T, s S) T { return t }
+//func first[T any, S any](t T, s S) T { return t }
 
 func main() {
 	log.Infof("Starting process with pid %d", os.Getpid())
 	log.RegisterExitHandler(logFatalHandler)
 
 	// read config, possible overloaded by ENV VARS
-	cfg, err := apiserver.LoadConfigFromPath(".")
+	cfg, err := apiserver.LoadConfigFromPath(".", apiserver.LoadOptions{DenyEnvironmentOverride: false})
 	if err != nil {
 		log.Error("could not load config, ", err)
 		return

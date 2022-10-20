@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -73,7 +74,7 @@ data:
     roles: "[[\"tester\"]]"
 `
 
-var configString = []byte(`
+var configString = `
 db:
   # select which db to use
   select: mongo
@@ -90,7 +91,7 @@ db:
 
 kubernetes:
   # how to locate the kubernetes server
-  kubeconfigpath: SET_FROM_ENV
+  kubeconfigpath: /home/ola/.kube/config
   # the namespace containing the flowify configuration and setup
   namespace: flowify-e2e
 
@@ -100,14 +101,14 @@ auth:
     issuer: e2e-test-runner
     audience: e2e-test
 #    keysurl: http://localhost:32023/jwkeys/
-    keysurl: SET_FROM_ENV
+    keysurl: DISABLE_JWT_SIGNATURE_VERIFICATION
 
 logging:
   loglevel: info
 
 server:
   port: 8443
-`)
+`
 
 var cfg apiserver.Config
 var server_addr string
@@ -130,11 +131,59 @@ func make_authentication_header(usr fuser.User, secret string) (string, error) {
 	return "Bearer " + tokenString, nil
 }
 
+// tries to deletes and wait for (re-)creation of (new) namespace
+func RecreateNamespace(name string, namespace string, k8s *kubernetes.Clientset) error {
+	deletePolicy := metav1.DeletePropagationForeground
+	var immediate int64 = 0
+	if err := k8s.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{
+		PropagationPolicy:  &deletePolicy,
+		GracePeriodSeconds: &immediate,
+	}); err == nil {
+		logrus.Infof("Deleting namespace '%s', may take a moment", namespace)
+	} else if k8serrors.IsNotFound(err) {
+		logrus.Infof("Safely skipping deletion of namespace %s, not found", namespace)
+	} else {
+		return errors.Wrap(err, "failed to recreate namespace")
+	}
+
+	// now try to create ns until succeeds
+	var backoff = wait.Backoff{
+		Steps:    10,
+		Duration: 500 * time.Millisecond,
+		Factor:   2.0,
+		Jitter:   0.1,
+	}
+
+	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace}}
+		_, err := k8s.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+
+		if err != nil {
+			//			log.Warn("failed to create ns: ", err)
+			if k8serrors.IsAlreadyExists(err) {
+				log.Warn("waiting to retry create namespace...")
+				return false, nil
+			} else {
+				// an error we cant handle
+				return false, err
+			}
+		}
+
+		return true, nil
+	}); err != nil {
+		return errors.Wrap(err, "failed waiting for 'create'")
+	}
+	logrus.Infof("Namespace %s  re-created", namespace)
+	return nil
+}
+
 func (s *e2eTestSuite) SetupSuite() {
 	log.Info("Setting up e2eTestSuite")
 
 	var err error
-	cfg, err = apiserver.LoadConfigFromReader(bytes.NewBuffer(configString))
+	cfg, err = apiserver.LoadConfigFromReader(strings.NewReader(configString), apiserver.LoadOptions{DenyEnvironmentOverride: true})
 	s.NoError(err)
 
 	log.Info(cfg)
@@ -145,8 +194,8 @@ func (s *e2eTestSuite) SetupSuite() {
 	s.client = &http.Client{}
 	s.client.Timeout = time.Second * 30
 
-	if apiserver.CommitSHA == "" {
-		log.Info("Trying to set build info from shel input")
+	if apiserver.CommitSHA == "unknown" {
+		log.Info("Trying to set build info from shell input")
 		cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
 		if stdout, err := cmd.Output(); err == nil {
 			apiserver.CommitSHA = strings.TrimSuffix(string(stdout), "\n")
@@ -166,24 +215,25 @@ func (s *e2eTestSuite) SetupSuite() {
 
 	go server.Run(ctx, &ready)
 
-	wsName := cfg.KubernetesKonfig.Namespace
-	if _, err := s.kubeclient.CoreV1().Namespaces().Get(context.TODO(), cfg.KubernetesKonfig.Namespace, metav1.GetOptions{}); k8serrors.IsNotFound(err) {
-		ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
-			Name:      cfg.KubernetesKonfig.Namespace,
-			Namespace: cfg.KubernetesKonfig.Namespace}}
-		ns, err = s.kubeclient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		s.NoError(err)
-	}
+	testNamespace := cfg.KubernetesKonfig.Namespace
+	log.Info("E2e test in namespace ", testNamespace)
 
-	if _, err := s.kubeclient.CoreV1().ConfigMaps(cfg.KubernetesKonfig.Namespace).Get(context.TODO(), wsName, metav1.GetOptions{}); k8serrors.IsNotFound(err) {
-		ws_test := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-			Name:      wsName,
-			Namespace: cfg.KubernetesKonfig.Namespace,
-			Labels:    map[string]string{"app.kubernetes.io/component": "workspace-config"},
-		}, Data: map[string]string{"roles": "[[\"tester\"]]"}}
-		ws_test, err = s.kubeclient.CoreV1().ConfigMaps(cfg.KubernetesKonfig.Namespace).Create(context.TODO(), ws_test, metav1.CreateOptions{})
-		s.NoError(err)
-	}
+	err = RecreateNamespace(testNamespace, testNamespace, s.kubeclient)
+	require.NoError(s.T(), err, "Config-namespace creation may not fail")
+
+	// set up workspaces
+	// 1. add a configmap to config namespace
+	// 2. Add the namespace
+	ws_test := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name:      "workspace",
+		Namespace: testNamespace,
+		Labels:    map[string]string{"app.kubernetes.io/component": "workspace-config"},
+	}, Data: map[string]string{"roles": "[\"tester\"]"}}
+	_, err = s.kubeclient.CoreV1().ConfigMaps(cfg.KubernetesKonfig.Namespace).Create(context.TODO(), ws_test, metav1.CreateOptions{})
+	s.NoError(err)
+
+	err = RecreateNamespace("workspace", "workspace", s.kubeclient)
+	require.NoError(s.T(), err, "Test namespace creation may not fail")
 
 	// make sure we get the ready signal
 	s.Equal(true, <-ready)
