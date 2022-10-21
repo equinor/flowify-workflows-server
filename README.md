@@ -33,7 +33,7 @@ The following services will be available at:
 | Flowify server      | 8842       |
 | MongoDB   | 27017        |
 
-To Get cluster contrainer IP Address:
+To Get cluster container IP Address:
 
 `docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' cluster-control-plane`
 
