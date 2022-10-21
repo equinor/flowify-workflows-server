@@ -43,7 +43,7 @@ Load kubeconfig from host machine
 
 Load example database to mongoDB
 ```bash
-docker cp ./dev/example_data mongo_server:/
+docker cp ./dev/example_data/dump mongo_server:/
 docker exec mongo_server mongorestore dump
 ```
 
