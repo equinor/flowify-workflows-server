@@ -107,8 +107,29 @@ func (ra RoleAuthorizer) GetSecretPermissions(usr user.User, data any) (map[Acti
 	return p, nil
 }
 
+func (ra RoleAuthorizer) GetVolumePermissions(usr user.User, data any) (map[Action]bool, error) {
+	p := make(map[Action]bool)
+
+	workspace, ok := data.(string)
+	if !ok {
+		return map[Action]bool{}, errors.Errorf("could not decode the workspace variable")
+	}
+
+	userAccess, adminAccess, err := ra.GetWorkspacePermissions(workspace, usr)
+	if err != nil {
+		return map[Action]bool{}, errors.Wrap(err, "could not get secret permissions")
+	}
+
+	// this is where access levels map to actions.
+	p[Read] = userAccess || adminAccess
+	p[List] = userAccess || adminAccess
+	p[Write] = adminAccess
+	p[Delete] = adminAccess
+
+	return p, nil
+}
+
 func (ra RoleAuthorizer) GetPermissions(subject Subject, action Action, usr user.User, data any) (bool, error) {
-	// start with no access
 	switch subject {
 	case Secrets:
 		perms, err := ra.GetSecretPermissions(usr, data)
@@ -119,7 +140,15 @@ func (ra RoleAuthorizer) GetPermissions(subject Subject, action Action, usr user
 			return p, nil
 		}
 		return false, errors.Errorf("Rule %s:%s not found", subject, action)
-
+	case Volumes:
+		perms, err := ra.GetVolumePermissions(usr, data)
+		if err != nil {
+			return false, err
+		}
+		if p, ok := perms[action]; ok {
+			return p, nil
+		}
+		return false, errors.Errorf("Rule %s:%s not found", subject, action)
 	default:
 		return false, errors.Errorf("no such subject '%s'", subject)
 	}
