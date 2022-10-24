@@ -1,20 +1,23 @@
-package rest
+package rest_test
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"path"
 	"testing"
 
+	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/models"
+	"github.com/equinor/flowify-workflows-server/rest"
 	"github.com/equinor/flowify-workflows-server/storage"
+	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/google/uuid"
 	gmux "github.com/gorilla/mux"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -358,14 +361,4 @@ func Test_DeleteVolumeHTTPHandler(t *testing.T) {
 			require.Equal(t, test.Code, res.StatusCode, BodyStringer{res.Body})
 		})
 	}
-}
-
-// specify an explicit type for inference
-// eg ReadType[int](...)
-func ReadType[T any](r *http.Response) (T, error) {
-	bytes := ResponseBodyBytes(r)
-	var item T
-
-	err := json.Unmarshal(bytes, &item)
-	return item, err
 }
