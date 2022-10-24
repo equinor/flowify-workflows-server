@@ -3,7 +3,7 @@ package apiserver
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -66,7 +66,7 @@ func Test_ApiServer(t *testing.T) {
 			require.NotNil(t, resp)
 
 			assert.Equal(t, test.StatusCode, resp.StatusCode)
-			payload, err := ioutil.ReadAll(resp.Body)
+			payload, err := io.ReadAll(resp.Body)
 			assert.NoError(t, err)
 			assert.Equal(t, test.Body, string(payload))
 		})

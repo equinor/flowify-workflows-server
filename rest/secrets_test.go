@@ -81,12 +81,18 @@ func ResponseBodyBytes(resp *http.Response) []byte {
 	return BodyStringer{resp.Body}.Bytes()
 }
 
-type MockAuthorization struct {
-	Access bool
+type MockSecretAuthorization struct {
+	Permissions map[auth.Action]bool
 }
 
-func (m MockAuthorization) Authorize(subject auth.Subject, action auth.Action, user user.User, object any) (bool, error) {
-	return m.Access, nil
+func (m MockSecretAuthorization) Authorize(subject auth.Subject, action auth.Action, user user.User, object any) (bool, error) {
+	if subject != auth.Secrets {
+		return false, errors.Errorf("Access denied", "Cannot authorize subject: %s", string(subject))
+	}
+	if access, ok := m.Permissions[action]; ok {
+		return access, nil
+	}
+	return false, errors.Errorf("Access denied", "Could not authorize action: %s", string(action))
 }
 
 func Fail(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +116,7 @@ func Test_PathAuthorization(t *testing.T) {
 	sclient := NewMockSecrets()
 	sclient.On("ListAvailableKeys", mock.Anything, mock.Anything).Return([]string{"s1", "s3"}, nil)
 
-	authz := MockAuthorization{Access: true}
+	authz := MockSecretAuthorization{Permissions: map[auth.Action]bool{auth.List: true}}
 
 	mux.HandleFunc("/", rest.PathAuthorization(auth.Secrets, auth.List, "workspace", authz, Pass)).Methods(http.MethodGet)
 	mux.HandleFunc("/{workspace}/", rest.PathAuthorization(auth.Secrets, auth.List, "workspace", authz, Pass)).Methods(http.MethodGet)
@@ -156,7 +162,7 @@ func Test_ListSecretsHTTPHandler(t *testing.T) {
 
 	sclient := NewMockSecrets()
 
-	authz := MockAuthorization{Access: false}
+	authz := MockSecretAuthorization{Permissions: map[auth.Action]bool{}}
 
 	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1Path), sclient, &authz)
 
@@ -201,7 +207,7 @@ func Test_ListSecretsHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// override authz for test
-			authz.Access = test.Access
+			authz.Permissions[auth.List] = test.Access
 
 			call := sclient.On("ListAvailableKeys", mock.Anything, mock.Anything).Return(test.ClientResponse.Keys, test.ClientResponse.Error)
 			defer call.Unset()
@@ -211,6 +217,14 @@ func Test_ListSecretsHTTPHandler(t *testing.T) {
 
 			require.Equal(t, test.ExpectedResponseStatusCode, w.Code, URL, BodyStringer{res.Body})
 
+			if w.Code == http.StatusOK {
+				type SecretListing struct {
+					Items []string
+				}
+				sl, err := ReadType[SecretListing](res)
+				require.NoError(t, err)
+				require.Len(t, sl.Items, len(test.ClientResponse.Keys), err)
+			}
 		})
 	}
 }
@@ -221,7 +235,7 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 	sclient := NewMockSecrets()
 	sclient.On("ListAvailableKeys", mock.Anything, mock.Anything).Return([]string{"s1", "s3"}, nil)
 
-	authz := MockAuthorization{Access: false}
+	authz := MockSecretAuthorization{Permissions: map[auth.Action]bool{}}
 	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1Path), sclient, &authz)
 
 	for _, test := range []struct {
@@ -315,11 +329,10 @@ func Test_AddSecretsHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// override authz for test
-			authz.Access = test.Access
+			authz.Permissions[auth.Write] = test.Access
 
 			mux.ServeHTTP(w, req)
 			res := w.Result()
-			defer res.Body.Close()
 
 			require.Equal(t, test.ExpectedResponseStatusCode, w.Code, URL, BodyStringer{res.Body})
 		})
@@ -330,7 +343,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 	mux := gmux.NewRouter()
 
 	sclient := NewMockSecrets()
-	authz := MockAuthorization{Access: false}
+	authz := MockSecretAuthorization{Permissions: map[auth.Action]bool{}}
 	rest.RegisterSecretRoutes(mux.PathPrefix(apiserver.ApiV1Path), sclient, &authz)
 
 	for _, test := range []struct {
@@ -387,7 +400,7 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// override authz for test
-			authz.Access = test.Access
+			authz.Permissions[auth.Delete] = test.Access
 
 			mux.ServeHTTP(w, req)
 			res := w.Result()
@@ -397,4 +410,12 @@ func Test_DeleteSecretsHTTPHandler(t *testing.T) {
 
 		})
 	}
+}
+
+func ReadType[T any](r *http.Response) (T, error) {
+	bytes := ResponseBodyBytes(r)
+	var item T
+
+	err := json.Unmarshal(bytes, &item)
+	return item, err
 }

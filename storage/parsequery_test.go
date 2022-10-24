@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-	"io/ioutil"
 	"testing"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 )
 
 func init() {
-	logrus.SetOutput(ioutil.Discard)
+
 }
 
 func Test_SortParse(t *testing.T) {

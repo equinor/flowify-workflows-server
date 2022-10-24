@@ -23,8 +23,9 @@ jobs:
           name: report
           path: testoutputs/e2ereport.xml
       - name: Publish end-to-end test results
-        uses: EnricoMi/publish-unit-test-result-action@v1
+        uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
           files: testoutputs/e2ereport.xml
+          check_name: End-to-end test results
 

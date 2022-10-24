@@ -123,6 +123,7 @@ func Test_ListVolumesHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 			mux.ServeHTTP(w, request)
 			res := w.Result()
+
 			defer res.Body.Close()
 
 			require.Equal(t, test.Code, res.StatusCode, BodyStringer{res.Body})
@@ -354,19 +355,10 @@ func Test_DeleteVolumeHTTPHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 			mux.ServeHTTP(w, request)
 			res := w.Result()
+
 			defer res.Body.Close()
 
 			require.Equal(t, test.Code, res.StatusCode, BodyStringer{res.Body})
 		})
 	}
-}
-
-// specify an explicit type for inference
-// eg ReadType[int](...)
-func ReadType[T any](r *http.Response) (T, error) {
-	bytes := ResponseBodyBytes(r)
-	var item T
-
-	err := json.Unmarshal(bytes, &item)
-	return item, err
 }

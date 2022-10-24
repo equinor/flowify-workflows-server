@@ -3,8 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"log"
+	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,7 +13,6 @@ import (
 )
 
 func init() {
-	log.SetOutput(ioutil.Discard)
 }
 
 func Test_CRefRoundtrip(t *testing.T) {
@@ -154,7 +152,7 @@ type TypeTest = func(item any, t *testing.T)
 
 func RoundtripFromFile(filename string, item any, t *testing.T, typeTest TypeTest) {
 
-	raw, err := ioutil.ReadFile(filename)
+	raw, err := os.ReadFile(filename)
 	assert.Nil(t, err)
 
 	RoundtripFromBytes(raw, item, t, typeTest)
@@ -287,7 +285,7 @@ func Test_ComponentSpec(t *testing.T) {
 	}
 	for _, test := range specTests {
 		t.Run(test.filename, func(t *testing.T) {
-			raw, err := ioutil.ReadFile(test.filename)
+			raw, err := os.ReadFile(test.filename)
 			assert.Nil(t, err)
 
 			// non-nil on error
@@ -345,7 +343,7 @@ func Test_Argument(t *testing.T) {
 
 func Test_Version(t *testing.T) {
 	var cmp Component
-	raw, err := ioutil.ReadFile("examples/minimal-map-component.json")
+	raw, err := os.ReadFile("examples/minimal-map-component.json")
 	assert.Nil(t, err)
 	err = json.Unmarshal(raw, &cmp)
 	assert.Nil(t, err)
