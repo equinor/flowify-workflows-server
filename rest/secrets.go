@@ -8,9 +8,7 @@ import (
 
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/pkg/secret"
-	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -25,30 +23,6 @@ func AuthorizationDenied(w http.ResponseWriter, r *http.Request, err error) {
 
 func SecretsPathAuthorization(action auth.Action, authz auth.AuthorizationClient, next http.HandlerFunc) http.HandlerFunc {
 	return PathAuthorization(auth.Secrets, action, "workspace", authz, next)
-}
-
-func PathAuthorization(subject auth.Subject, action auth.Action, pathVariableName string, authz auth.AuthorizationClient, next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pathVariable, exists := mux.Vars(r)[pathVariableName]
-		if !exists {
-			AuthorizationDenied(w, r, fmt.Errorf("bad request"))
-			return
-		}
-
-		user := user.GetUser(r.Context())
-
-		if allow, err := authz.Authorize(subject, action, user, pathVariable); err != nil || !allow {
-			if err == nil {
-				err = fmt.Errorf("not authorized")
-			}
-			logrus.Info("Authorization denied: ", subject, action, user, pathVariable)
-			AuthorizationDenied(w, r, err)
-			return
-		}
-
-		next(w, r)
-
-	})
 }
 
 func RegisterSecretRoutes(r *mux.Route, sclient secret.SecretClient, authz auth.AuthorizationClient) {

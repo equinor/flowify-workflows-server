@@ -125,7 +125,7 @@ func RegisterRoutes(r *mux.Route,
 	RegisterWorkflowRoutes(subrouter.PathPrefix(""), componentClient)
 	RegisterJobRoutes(subrouter.PathPrefix(""), componentClient, argoclient)
 	RegisterSecretRoutes(subrouter.PathPrefix(""), secretClient, authz)
-	RegisterVolumeRoutes(subrouter.PathPrefix(""), volumeClient)
+	RegisterVolumeRoutes(subrouter.PathPrefix(""), volumeClient, authz)
 
 }
 
@@ -180,6 +180,29 @@ func CheckAcceptRequestHeaderMiddleware(mediatype string) func(http.Handler) htt
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func PathAuthorization(subject auth.Subject, action auth.Action, pathVariableName string, authz auth.AuthorizationClient, next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pathVariable, exists := mux.Vars(r)[pathVariableName]
+		if !exists {
+			AuthorizationDenied(w, r, fmt.Errorf("bad request"))
+			return
+		}
+
+		user := user.GetUser(r.Context())
+
+		if allow, err := authz.Authorize(subject, action, user, pathVariable); err != nil || !allow {
+			if err == nil {
+				err = fmt.Errorf("not authorized")
+			}
+			AuthorizationDenied(w, r, err)
+			return
+		}
+
+		next(w, r)
+
+	})
 }
 
 // This ensures that the context is authenticated, with the appropriate User-tokens

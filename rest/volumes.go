@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/storage"
 
@@ -12,7 +13,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func RegisterVolumeRoutes(r *mux.Route, client storage.VolumeClient) {
+func VolumesPathAuthorization(action auth.Action, authz auth.AuthorizationClient, next http.HandlerFunc) http.HandlerFunc {
+	return PathAuthorization(auth.Volumes, action, "workspace", authz, next)
+}
+
+func RegisterVolumeRoutes(r *mux.Route, client storage.VolumeClient, authz auth.AuthorizationClient) {
 	s := r.Subrouter()
 
 	const intype = "application/json"
@@ -22,11 +27,12 @@ func RegisterVolumeRoutes(r *mux.Route, client storage.VolumeClient) {
 	s.Use(CheckAcceptRequestHeaderMiddleware(outtype))
 	s.Use(SetContentTypeMiddleware(outtype))
 
-	s.HandleFunc("/volumes/{workspace}/", VolumesListHandler(client)).Methods(http.MethodGet)
-	s.HandleFunc("/volumes/{workspace}/", VolumePostHandler(client)).Methods(http.MethodPost)
-	s.HandleFunc("/volumes/{workspace}/{id}", VolumeGetHandler(client)).Methods(http.MethodGet)
-	s.HandleFunc("/volumes/{workspace}/{id}", VolumePutHandler(client)).Methods(http.MethodPut)
-	s.HandleFunc("/volumes/{workspace}/{id}", VolumeDeleteHandler(client)).Methods(http.MethodDelete)
+	s.HandleFunc("/volumes/{workspace}/", VolumesPathAuthorization(auth.List, authz, VolumesListHandler(client))).Methods(http.MethodGet)
+	s.HandleFunc("/volumes/{workspace}/", VolumesPathAuthorization(auth.Write, authz, VolumePostHandler(client))).Methods(http.MethodPost)
+	s.HandleFunc("/volumes/{workspace}/{id}", VolumesPathAuthorization(auth.Read, authz, VolumeGetHandler(client))).Methods(http.MethodGet)
+	s.HandleFunc("/volumes/{workspace}/{id}", VolumesPathAuthorization(auth.Write, authz, VolumePutHandler(client))).Methods(http.MethodPut)
+	s.HandleFunc("/volumes/{workspace}/{id}", VolumesPathAuthorization(auth.Delete, authz, VolumeDeleteHandler(client))).Methods(http.MethodDelete)
+
 }
 
 func VolumesListHandler(vclient storage.VolumeClient) http.HandlerFunc {
