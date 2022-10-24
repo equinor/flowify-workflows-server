@@ -29,7 +29,7 @@
         ],
         "nodes": [
           {
-            "id": "1",
+            "id": "a1",
             "node": {
               "uid": "00000000-0000-0000-0000-000000000004",
               "type": "component",
@@ -40,6 +40,7 @@
               "implementation": {
                 "type": "brick",
                 "container": {
+                  "name": "whale",
                   "image": "docker/whalesay",
                   "command": ["cowsay"]
                 },

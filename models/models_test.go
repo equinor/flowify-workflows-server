@@ -282,6 +282,8 @@ func Test_ComponentSpec(t *testing.T) {
 		{"examples/job-example.json", "spec/job.schema.json"},
 		{"examples/job-map-example.json", "spec/job.schema.json"},
 		{"examples/job-submap-example.json", "spec/job.schema.json"},
+		{"examples/job-mounts.json", "spec/job.schema.json"},
+		{"examples/graph-input-volumes.json", "spec/job.schema.json"},
 	}
 	for _, test := range specTests {
 		t.Run(test.filename, func(t *testing.T) {
