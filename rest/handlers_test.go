@@ -600,7 +600,7 @@ func Test_WorkspacesHTTPHandler(t *testing.T) {
 		{Name: "list empty workspaces",
 			GivenAccess: []workspace.Workspace{}},
 		{Name: "list workspaces with access",
-			GivenAccess: []workspace.Workspace{{Name: "test", HasAccess: true, MissingRoles: nil}}},
+			GivenAccess: []workspace.Workspace{{Name: "test"}}},
 	}
 
 	for _, test := range testcases {

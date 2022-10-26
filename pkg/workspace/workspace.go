@@ -1,7 +1,6 @@
 package workspace
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"sync"
@@ -36,14 +35,11 @@ type Workspace struct {
 
 	// the list of required roles for access
 	Roles [][]userpkg.Role `json:"roles,omitempty"`
-
-	HasAccess    bool            `json:"hasAccess"`
-	MissingRoles [][]MissingRole `json:"missingRoles,omitempty"`
 }
 
 type WorkspaceClient interface {
 	// list the workspaces visible to a specific user
-	ListWorkspaces(ctx context.Context, user userpkg.User) ([]Workspace, error)
+	ListWorkspaces() []Workspace
 	GetNamespace() string
 }
 
@@ -120,17 +116,6 @@ const (
 type MissingRole struct {
 	Name        userpkg.Role `json:"name"`
 	Description string       `json:"description"`
-}
-
-// queries the access list for a matching access and returns true if found, else false
-func HasAccess(ws []Workspace, ns string) bool {
-	for _, w := range ws {
-		if w.Name == ns && w.HasAccess {
-			return true
-		}
-	}
-
-	return false
 }
 
 func listWorkspaceConfigMaps(namespace string, cmInformer v1.ConfigMapInformer) ([]Workspace, error) {
@@ -271,34 +256,6 @@ func getAccessTokens(cm *core.ConfigMap) ([][]userpkg.Role, error) {
 	}
 }
 
-func (wimpl *workspaceImpl) ListWorkspaces(ctx context.Context, user userpkg.User) ([]Workspace, error) {
-	// make a copy of the workspaces
-	// append only those that have read rights or are not hidden
-	aws := make([]Workspace, 0, len(wimpl.ws))
-	for _, w := range wimpl.ws {
-		aw := w
-		// set hasaccess for this particular user
-		aw.HasAccess = w.UserHasAccess(user)
-		if aw.HasAccess || !aw.HideForUnauthorized {
-
-			if !aw.HasAccess {
-				// append the missing roles
-				missingRoles := [][]MissingRole{}
-				for _, group := range aw.Roles {
-					missing := []MissingRole{}
-					for _, r := range group {
-						if !userpkg.UserHasRole(user, r) {
-							missing = append(missing, MissingRole{Name: r, Description: wimpl.roleDescriptions[string(r)]})
-						}
-					}
-					missingRoles = append(missingRoles, missing)
-				}
-				aw.MissingRoles = missingRoles
-			}
-			aws = append(aws, aw)
-		}
-	}
-
-	// return authorized list
-	return aws, nil
+func (wimpl *workspaceImpl) ListWorkspaces() []Workspace {
+	return wimpl.ws
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
+	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/pkg/errors"
@@ -365,15 +366,25 @@ func (c *MongoStorageClient) deleteCallback(ctx context.Context, documentKind Do
 	return result, err
 }
 
-// Some of the db-accessors below require an authenticated context
-func GetWorkspaceAccess(ctx context.Context) []workspace.Workspace {
+func getWorkspacesFromContext(ctx context.Context) []workspace.Workspace {
 	val := ctx.Value(workspace.WorkspaceKey)
-
 	if val == nil {
 		return []workspace.Workspace{}
-	} else {
-		return val.([]workspace.Workspace)
 	}
+	return val.([]workspace.Workspace)
+}
+
+// Some of the db-accessors below require an authenticated context
+// TODO: method should be removed and replaced by granularity access control method
+func CheckWorkspaceAccess(ctx context.Context, ns string) bool {
+	// get all 'visible' workspaces
+	wss := getWorkspacesFromContext(ctx)
+	for _, w := range wss {
+		if w.Name == ns {
+			return w.UserHasAccess(user.GetUser(ctx))
+		}
+	}
+	return false
 }
 
 func (c *MongoStorageClient) getCRefVersion(ctx context.Context, id interface{}, getter getCollection) (models.CRefVersion, error) {
@@ -825,8 +836,8 @@ func (c *MongoStorageClient) ListComponentVersionsMetadata(ctx context.Context, 
 
 func (c *MongoStorageClient) CreateWorkflow(ctx context.Context, node models.Workflow) error {
 	// make sure we have authz
-	wsAccess := GetWorkspaceAccess(ctx)
-	if !workspace.HasAccess(wsAccess, node.Workspace) {
+	hasWsAccess := CheckWorkspaceAccess(ctx, node.Workspace)
+	if !hasWsAccess {
 		return fmt.Errorf("user has no access to workspace (%s)", node.Workspace)
 	}
 
@@ -882,9 +893,6 @@ func (c *MongoStorageClient) PatchWorkflow(ctx context.Context, node models.Work
 }
 
 func (c *MongoStorageClient) GetWorkflow(ctx context.Context, id interface{}) (models.Workflow, error) {
-	// make sure we have authz
-	wsAccess := GetWorkspaceAccess(ctx)
-
 	coll := c.getWorkflowCollection()
 	var result models.Workflow
 	vcref, err := c.getCRefVersion(ctx, id, c.getWorkflowCollection)
@@ -904,7 +912,9 @@ func (c *MongoStorageClient) GetWorkflow(ctx context.Context, id interface{}) (m
 		return models.Workflow{}, errors.Wrapf(err, "Error getting workflow {uid: %s, version: %s} from storage", vcref.Uid.String(), vcref.Version.String())
 	}
 
-	if !workspace.HasAccess(wsAccess, result.Workspace) {
+	// make sure we have authz
+	hasWsAccess := CheckWorkspaceAccess(ctx, result.Workspace)
+	if !hasWsAccess {
 		return models.Workflow{}, fmt.Errorf("user has no access to workspace (%s)", result.Workspace)
 	}
 
@@ -947,11 +957,9 @@ func ProjectionFromBsonTags(fields []reflect.StructField) []bson.E {
 }
 
 func createWorkspaceFilter(wsAccesses []workspace.Workspace, wsFieldPath string) bson.D {
-	ws := make([]string, 0)
+	ws := []string{}
 	for _, s := range wsAccesses {
-		if s.HasAccess {
-			ws = append(ws, s.Name)
-		}
+		ws = append(ws, s.Name)
 	}
 	wsFilter := bson.D{{Key: wsFieldPath, Value: bson.D{{Key: "$in", Value: ws}}}}
 	return wsFilter
@@ -959,9 +967,15 @@ func createWorkspaceFilter(wsAccesses []workspace.Workspace, wsFieldPath string)
 
 func (c *MongoStorageClient) ListWorkflowsMetadata(ctx context.Context, pagination Pagination, filterstrings []string, sorts []string) (models.MetadataWorkspaceList, error) {
 	// make sure we have authz
-	wsAccess := GetWorkspaceAccess(ctx)
+	usr := user.GetUser(ctx)
+	wss := getWorkspacesFromContext(ctx)
+	wsAccess := []workspace.Workspace{}
+	for _, ws := range wss {
+		if ws.UserHasAccess(usr) {
+			wsAccess = append(wsAccess, ws)
+		}
+	}
 	if len(wsAccess) == 0 {
-		// just an early access every item is secured below
 		return models.MetadataWorkspaceList{}, nil
 	}
 
@@ -1058,16 +1072,15 @@ func (c *MongoStorageClient) ListWorkflowsMetadata(ctx context.Context, paginati
 }
 
 func (c *MongoStorageClient) ListWorkflowVersionsMetadata(ctx context.Context, id models.ComponentReference, pagination Pagination, sorts []string) (models.MetadataWorkspaceList, error) {
-	// make sure we have authz
-	wsAccess := GetWorkspaceAccess(ctx)
-	if len(wsAccess) == 0 {
+	wss := getWorkspacesFromContext(ctx)
+	if len(wss) == 0 {
 		// just an early access every item is secured below
 		return models.MetadataWorkspaceList{}, nil
 	}
 
 	stages := mongo.Pipeline{}
 
-	filter := createWorkspaceFilter(wsAccess, "workspace")
+	filter := createWorkspaceFilter(wss, "workspace")
 	filter = append(filter, bson.E{Key: "uid", Value: id})
 	matchStage := bson.D{bson.E{Key: "$match", Value: filter}}
 	stages = append(stages, matchStage)
@@ -1179,7 +1192,7 @@ func (c *MongoStorageClient) GetJob(ctx context.Context, id models.ComponentRefe
 		return result, errors.Wrapf(err, "Error getting job %s from storage", id)
 	}
 
-	if !workspace.HasAccess(GetWorkspaceAccess(ctx), result.Workflow.Workspace) {
+	if !CheckWorkspaceAccess(ctx, result.Workflow.Workspace) {
 		return models.Job{}, fmt.Errorf("user has no access to workspace (%s)", result.Workflow.Workspace)
 	}
 
@@ -1188,8 +1201,7 @@ func (c *MongoStorageClient) GetJob(ctx context.Context, id models.ComponentRefe
 
 func (c *MongoStorageClient) CreateJob(ctx context.Context, node models.Job) error {
 	// make sure we have authz
-	wsAccess := GetWorkspaceAccess(ctx)
-	if !workspace.HasAccess(wsAccess, node.Workflow.Workspace) {
+	if !CheckWorkspaceAccess(ctx, node.Workflow.Workspace) {
 		return fmt.Errorf("user has no access to workspace (%s)", node.Workflow.Workspace)
 	}
 
@@ -1211,7 +1223,14 @@ func (c *MongoStorageClient) CreateJob(ctx context.Context, node models.Job) err
 
 func (c *MongoStorageClient) ListJobsMetadata(ctx context.Context, pagination Pagination, filterstrings []string, sorts []string) (models.MetadataWorkspaceList, error) {
 	// make sure we have authz
-	wsAccess := GetWorkspaceAccess(ctx)
+	usr := user.GetUser(ctx)
+	wss := getWorkspacesFromContext(ctx)
+	wsAccess := []workspace.Workspace{}
+	for _, ws := range wss {
+		if ws.UserHasAccess(usr) {
+			wsAccess = append(wsAccess, ws)
+		}
+	}
 	if len(wsAccess) == 0 {
 		// just an early access every item is secured below
 		return models.MetadataWorkspaceList{}, nil

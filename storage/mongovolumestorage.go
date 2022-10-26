@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/equinor/flowify-workflows-server/models"
-	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -97,12 +96,11 @@ func makeFilterSortPipeline(pagination Pagination, filterstrings []string, sorts
 }
 
 func (c *MongoVolumeClientImpl) ListVolumes(ctx context.Context, pagination Pagination, filterstrings []string, sortstrings []string) (models.FlowifyVolumeList, error) {
-	// make sure we have authz
-	wsAccess := GetWorkspaceAccess(ctx)
+	wss := getWorkspacesFromContext(ctx)
 
 	stages := mongo.Pipeline{}
 	{
-		wsstage := bson.D{bson.E{Key: "$match", Value: createWorkspaceFilter(wsAccess, "workspace")}}
+		wsstage := bson.D{bson.E{Key: "$match", Value: createWorkspaceFilter(wss, "workspace")}}
 		stages = append(stages, wsstage)
 	}
 
@@ -162,7 +160,7 @@ func (c *MongoVolumeClientImpl) GetVolume(ctx context.Context, id models.Compone
 		return models.FlowifyVolume{}, errors.Wrapf(err, "Error getting component %s from storage", id)
 	}
 
-	if !workspace.HasAccess(GetWorkspaceAccess(ctx), result.Workspace) {
+	if !CheckWorkspaceAccess(ctx, result.Workspace) {
 		return models.FlowifyVolume{}, ErrNoAccess
 	}
 
@@ -174,7 +172,7 @@ func (c *MongoVolumeClientImpl) PutVolume(ctx context.Context, vol models.Flowif
 		return fmt.Errorf("uid required")
 	}
 
-	if !workspace.HasAccess(GetWorkspaceAccess(ctx), vol.Workspace) {
+	if !CheckWorkspaceAccess(ctx, vol.Workspace) {
 		return ErrNoAccess
 	}
 
@@ -211,7 +209,7 @@ func (c *MongoVolumeClientImpl) DeleteVolume(ctx context.Context, id models.Comp
 		return errors.Wrap(err, "could not delete volume")
 	}
 
-	if !workspace.HasAccess(GetWorkspaceAccess(ctx), vol.Workspace) {
+	if !CheckWorkspaceAccess(ctx, vol.Workspace) {
 		return ErrNoAccess
 	}
 

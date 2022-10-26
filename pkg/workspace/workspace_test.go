@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
-	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -117,32 +115,12 @@ func getClient() workspace.WorkspaceClient {
 
 func Test_WorkspaceClientListWorkspaces(t *testing.T) {
 	client := getClient()
-	ws, err := client.ListWorkspaces(ctx, auth.AzureTokenUser{Roles: []user.Role{"token1", "token4", "token3", "token2"}})
-	require.NoError(t, err)
+	ws := client.ListWorkspaces()
 
 	// Should return both workspaces
 	require.Len(t, ws, 2)
-
-	ws, err = client.ListWorkspaces(ctx, auth.AzureTokenUser{Roles: []user.Role{"token1", "token2"}})
-	require.NoError(t, err)
-
-	// Should return one workspace with no access
-	require.Len(t, ws, 1)
-	require.Equal(t, "workspace-xyz", ws[0].Name)
-	require.Equal(t, false, ws[0].HasAccess)
-	require.Len(t, ws[0].MissingRoles, 1)
-	require.Equal(t, user.Role("token4"), ws[0].MissingRoles[0][0].Name)
-	require.Equal(t, "Only given to the bravest", ws[0].MissingRoles[0][0].Description)
-
-	ws, err = client.ListWorkspaces(ctx, auth.AzureTokenUser{Roles: []user.Role{"token1", "token4"}})
-	require.NoError(t, err)
-
-	// Should return one workspace that can be accessed
-	require.Len(t, ws, 2)
-
 	for _, w := range ws {
 		require.Contains(t, []string{"workspace-xyz", "workspace-abc"}, w.Name)
-		require.Equal(t, true, w.HasAccess)
 	}
 }
 
@@ -154,16 +132,11 @@ func Test_WorkspaceNoRoleConfigMap(t *testing.T) {
 
 	client := workspace.NewWorkspaceClient(fake.NewSimpleClientset(&cm1, &cm2), namespace)
 
-	ws, err := client.ListWorkspaces(ctx, auth.AzureTokenUser{Roles: []user.Role{"token1", "token2"}})
-	require.NoError(t, err)
+	ws := client.ListWorkspaces()
 
-	// Should return one workspace with no access
-	require.Len(t, ws, 1)
-	require.Equal(t, "workspace-xyz", ws[0].Name)
-	require.Equal(t, false, ws[0].HasAccess)
-	require.Len(t, ws[0].MissingRoles, 1)
-	require.Equal(t, user.Role("token4"), ws[0].MissingRoles[0][0].Name)
-	require.Len(t, ws[0].MissingRoles[0][0].Description, 0, "no descriptions for any roles")
-
-	require.Nil(t, err)
+	// Should return both workspaces
+	require.Len(t, ws, 2)
+	for _, w := range ws {
+		require.Contains(t, []string{"workspace-xyz", "workspace-abc"}, w.Name)
+	}
 }

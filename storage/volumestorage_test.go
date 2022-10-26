@@ -8,6 +8,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/storage"
+	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -16,6 +17,9 @@ import (
 func TestDeleteVolume(t *testing.T) {
 	c, err := storage.NewMongoVolumeClientFromConfig(cfg, mclient)
 	require.NoError(t, err)
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
+	ws := []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}}
+	authCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, ws)
 
 	vol := models.FlowifyVolume{
 		Workspace: "test",
@@ -24,15 +28,11 @@ func TestDeleteVolume(t *testing.T) {
 	{
 		// first add component to get
 		// create context with access
-		ws := []workspace.Workspace{{Name: "test", HasAccess: true}}
-		authCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, ws)
 		err := c.PutVolume(authCtx, vol)
 		assert.Nil(t, err)
 	}
 
 	{
-		ws := []workspace.Workspace{{Name: "test", HasAccess: true}}
-		authCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, ws)
 		vol_out, err := c.GetVolume(authCtx, vol.Uid)
 		assert.Nil(t, err)
 		assert.Equal(t, vol, vol_out)
@@ -48,8 +48,8 @@ func TestDeleteVolume(t *testing.T) {
 		assert.ErrorContains(t, err, storage.ErrNoAccess.Error())
 
 		// get access
-		ws := []workspace.Workspace{{Name: vol.Workspace, HasAccess: true}}
-		authCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, ws)
+		ws := []workspace.Workspace{{Name: vol.Workspace, Roles: [][]user.Role{{"tester"}}}}
+		authCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, ws)
 		err = c.DeleteVolume(authCtx, vol.Uid)
 		assert.Nil(t, err)
 
@@ -67,6 +67,7 @@ func TestDeleteVolume(t *testing.T) {
 func TestGetVolume(t *testing.T) {
 	c, err := storage.NewMongoVolumeClientFromConfig(cfg, mclient)
 	require.NoError(t, err)
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 
 	vol := models.FlowifyVolume{
 		Workspace: "test",
@@ -75,8 +76,8 @@ func TestGetVolume(t *testing.T) {
 
 	{
 		// create context with access
-		ws := []workspace.Workspace{{Name: "test", HasAccess: true}}
-		authCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, ws)
+		ws := []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}}
+		authCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, ws)
 		err := c.PutVolume(authCtx, vol)
 		assert.Nil(t, err)
 	}
@@ -95,25 +96,25 @@ func TestGetVolume(t *testing.T) {
 			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Good authz context",
 			CRef:            vol.Uid,
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   nil},
 		{Name: "Good authz context, bad ref",
 			CRef:            models.NewComponentReference(),
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   storage.ErrNotFound},
 		{Name: "Authz context with name but no access",
 			CRef:            vol.Uid,
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"dummy"}}}},
 			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Authz context with similar name/access",
 			CRef:            vol.Uid,
-			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "tes", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   storage.ErrNoAccess},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, test.WorkspaceAccess)
 			vol_out, err := c.GetVolume(authzCtx, test.CRef)
 			assert.Equal(t, err, test.ExpectedError)
 			if err == nil {
@@ -127,6 +128,7 @@ func TestGetVolume(t *testing.T) {
 func TestPutVolume(t *testing.T) {
 	c, err := storage.NewMongoVolumeClientFromConfig(cfg, mclient)
 	require.NoError(t, err)
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 
 	vol := models.FlowifyVolume{
 		Workspace: "test",
@@ -134,8 +136,8 @@ func TestPutVolume(t *testing.T) {
 		Volume:    corev1.Volume{Name: "test1-for-overwrite"}}
 	{
 		// create context with access
-		ws := []workspace.Workspace{{Name: "test", HasAccess: true}}
-		authCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, ws)
+		ws := []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}}
+		authCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, ws)
 		err := c.PutVolume(authCtx, vol)
 		assert.Nil(t, err)
 	}
@@ -157,37 +159,37 @@ func TestPutVolume(t *testing.T) {
 			ExpectedFail:    true,
 			ExpectedError:   storage.ErrNoAccess},
 		{Name: "No authz context (explicit)",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"dummy"}}}},
 			CRef:            vol.Uid,
 			Workspace:       "test",
 			ExpectedFail:    true,
 			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Good authz context",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			CRef:            vol.Uid,
 			Workspace:       "test",
 			ExpectedFail:    false,
 			ExpectedError:   nil},
 		{Name: "Good authz context, try moving to unauth ws",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			CRef:            vol.Uid,
 			Workspace:       "test2",
 			ExpectedFail:    true,
 			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Good authz context, try moving to new ws",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test2", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}, {Name: "test2", Roles: [][]user.Role{{"tester"}}}},
 			CRef:            vol.Uid,
 			Workspace:       "test2",
 			ExpectedFail:    false,
 			ExpectedError:   nil},
 		{Name: "Authz context with name but no access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"dummy"}}}},
 			CRef:            vol.Uid,
 			Workspace:       "test",
 			ExpectedFail:    true,
 			ExpectedError:   storage.ErrNoAccess},
 		{Name: "Authz context with similar name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "tes", Roles: [][]user.Role{{"tester"}}}},
 			CRef:            vol.Uid,
 			Workspace:       "test",
 			ExpectedFail:    true,
@@ -199,7 +201,7 @@ func TestPutVolume(t *testing.T) {
 			tVol := vol
 			tVol.Workspace = test.Workspace
 			tVol.Uid = test.CRef
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, test.WorkspaceAccess)
 			err := c.PutVolume(authzCtx, tVol)
 			if test.ExpectedFail {
 				assert.NotNil(t, err)
@@ -214,6 +216,7 @@ func TestPutVolume(t *testing.T) {
 func TestListVolumes(t *testing.T) {
 	c, err := storage.NewMongoVolumeClientFromConfig(cfg, mclient)
 	require.NoError(t, err)
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 
 	{
 		// drop db to make sure that at the end DB will contain one components
@@ -221,7 +224,7 @@ func TestListVolumes(t *testing.T) {
 
 		// first add components to list
 		for i := 0; i < 5; i++ {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "ws-1", HasAccess: true}})
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: "ws-1", Roles: [][]user.Role{{"tester"}}}})
 			err := c.PutVolume(authzCtx,
 				models.FlowifyVolume{
 					Uid:       models.NewComponentReference(),
@@ -230,7 +233,7 @@ func TestListVolumes(t *testing.T) {
 			assert.Nil(t, err)
 		}
 		for i := 5; i < 10; i++ {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "ws-2", HasAccess: true}})
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: "ws-2", Roles: [][]user.Role{{"tester"}}}})
 			err := c.PutVolume(authzCtx,
 				models.FlowifyVolume{
 					Uid:       models.NewComponentReference(),
@@ -239,7 +242,7 @@ func TestListVolumes(t *testing.T) {
 			assert.Nil(t, err)
 		}
 		for i := 10; i < 15; i++ {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "ws-3", HasAccess: true}})
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: "ws-3", Roles: [][]user.Role{{"tester"}}}})
 			err := c.PutVolume(authzCtx,
 				models.FlowifyVolume{
 					Uid:       models.NewComponentReference(),
@@ -271,9 +274,9 @@ func TestListVolumes(t *testing.T) {
 			Filters: nil,
 			Sorting: nil,
 			WorkspaceAccess: []workspace.Workspace{
-				{Name: "ws-1", HasAccess: true},
-				{Name: "ws-2", HasAccess: true},
-				{Name: "ws-3", HasAccess: true}},
+				{Name: "ws-1", Roles: [][]user.Role{{"tester"}}},
+				{Name: "ws-2", Roles: [][]user.Role{{"tester"}}},
+				{Name: "ws-3", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError: nil,
 			ExpectedSize:  15,
 		},
@@ -281,9 +284,9 @@ func TestListVolumes(t *testing.T) {
 			Filters: []string{"workspace[==]=ws-2"},
 			Sorting: nil,
 			WorkspaceAccess: []workspace.Workspace{
-				{Name: "ws-1", HasAccess: true},
-				{Name: "ws-2", HasAccess: true},
-				{Name: "ws-3", HasAccess: true}},
+				{Name: "ws-1", Roles: [][]user.Role{{"tester"}}},
+				{Name: "ws-2", Roles: [][]user.Role{{"tester"}}},
+				{Name: "ws-3", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError: nil,
 			ExpectedSize:  5,
 		},
@@ -291,7 +294,7 @@ func TestListVolumes(t *testing.T) {
 			Filters: nil,
 			Sorting: nil,
 			WorkspaceAccess: []workspace.Workspace{
-				{Name: "ws-2", HasAccess: true},
+				{Name: "ws-2", Roles: [][]user.Role{{"tester"}}},
 			},
 			ExpectedError: nil,
 			ExpectedSize:  5,
@@ -303,8 +306,6 @@ func TestListVolumes(t *testing.T) {
 			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
 			list, err := c.ListVolumes(authzCtx, storage.Pagination{20, 0}, test.Filters, test.Sorting)
 			assert.Equal(t, err, test.ExpectedError)
-			if err == nil {
-			}
 			assert.Equal(t, test.ExpectedSize, len(list.Items))
 			assert.Equal(t, test.ExpectedSize, list.PageInfo.TotalNumber)
 
