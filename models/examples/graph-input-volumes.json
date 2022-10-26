@@ -20,16 +20,16 @@
         "inputMappings": [
           {
             "source": { "port": "mount-0" },
-            "target": { "node": "1", "port": "mount-a" }
+            "target": { "node": "a1", "port": "mount-a" }
           },
           {
             "source": { "port": "mount-1" },
-            "target": { "node": "1", "port": "mount-b" }
+            "target": { "node": "a1", "port": "mount-b" }
           }
         ],
         "nodes": [
           {
-            "id": "1",
+            "id": "a1",
             "node": {
               "uid": "00000000-0000-0000-0000-000000000004",
               "type": "component",
@@ -40,6 +40,7 @@
               "implementation": {
                 "type": "brick",
                 "container": {
+                  "name": "whale",
                   "image": "docker/whalesay",
                   "command": ["cowsay"]
                 },
