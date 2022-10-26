@@ -356,8 +356,9 @@ func InitializeMetadata(ctx context.Context, meta *models.Metadata) error {
 	id := models.NewComponentReference()
 	meta.Uid = id
 	TouchMetadata(ctx, meta)
+	err := meta.Version.InitializeNew()
 
-	return nil
+	return err
 }
 
 func TouchMetadata(ctx context.Context, meta *models.Metadata) {

@@ -46,32 +46,33 @@ var mockUser fuser.User = fuser.MockUser{
 	Uid:   "0",
 	Name:  "Auth Disabled",
 	Email: "auth@disabled",
-	Roles: []fuser.Role{"tester", "dummy"},
+	Roles: []fuser.Role{"tester", "dummy", "sandbox-developer"},
 }
 
-var testWorkspace string = `
----
-# Namespace 'sandbox-project-a'
-apiVersion: v1
-kind: Namespace
-metadata:
-  labels:
-    app.kubernetes.io/part-of: "flowify"
-  name: "test"
+// TODO: not in use, add clean workspace for e2e tests in k8s
+// var testWorkspace string = `
+// ---
+// # Namespace 'sandbox-project-a'
+// apiVersion: v1
+// kind: Namespace
+// metadata:
+//   labels:
+//     app.kubernetes.io/part-of: "flowify"
+//   name: "test"
 
----
-# Developer workspace environment
-apiVersion: v1
-kind: ConfigMap
-metadata:
-    labels:
-        app.kubernetes.io/component: "workspace-config"
-        app.kubernetes.io/part-of: "flowify"
-    name: "test"
-    namespace: "test"
-data:
-    roles: "[[\"tester\"]]"
-`
+// ---
+// # Developer workspace environment
+// apiVersion: v1
+// kind: ConfigMap
+// metadata:
+//     labels:
+//         app.kubernetes.io/component: "workspace-config"
+//         app.kubernetes.io/part-of: "flowify"
+//     name: "test"
+//     namespace: "test"
+// data:
+//     roles: "[[\"tester\"]]"
+// `
 
 var configString = []byte(`
 db:
@@ -380,7 +381,7 @@ func (s *e2eTestSuite) Test_Roundtrip_Workflow() {
 
 	resp, err := requestor(server_addr+"/api/v1/workflows/", http.MethodPost, wfReq)
 	s.NoError(err)
-	require.Equal(s.T(), http.StatusCreated, resp.StatusCode)
+	require.Equal(s.T(), http.StatusCreated, resp.StatusCode, BodyStringer{resp.Body})
 
 	var wfResp models.Workflow
 	err = marshalResponse(ResponseBodyBytes(resp), &wfResp)
@@ -445,7 +446,7 @@ func (s *e2eTestSuite) Test_Roundtrip_Job() {
 	resp2, err := requestor(fmt.Sprintf(server_addr+"/api/v1/jobs/%s", wfResp.Metadata.Uid.String()), http.MethodGet, wfReq)
 	s.NoError(err)
 
-	var wfResp2 models.Workflow
+	var wfResp2 models.Job
 	err = marshalResponse(ResponseBodyBytes(resp2), &wfResp2)
 	s.NoError(err)
 	s.Equal(wfResp, wfResp2, "expect roundtrip equality")

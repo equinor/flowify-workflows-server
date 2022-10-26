@@ -15,7 +15,7 @@ func (s *e2eTestSuite) Test_Workspaces() {
 	require.Equal(s.T(), http.StatusOK, resp.StatusCode, BodyStringer{resp.Body})
 
 	type WorkspaceList struct {
-		Items []workspace.Workspace `json:"items"`
+		Items []workspace.WorkspaceGetRequest `json:"items"`
 	}
 	var list WorkspaceList
 	err = marshalResponse(ResponseBodyBytes(resp), &list)
