@@ -259,3 +259,9 @@ func getAccessTokens(cm *core.ConfigMap) ([][]userpkg.Role, error) {
 func (wimpl *workspaceImpl) ListWorkspaces() []Workspace {
 	return wimpl.ws
 }
+
+type WorkspaceGetRequest struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Roles       []string `json:"roles"`
+}

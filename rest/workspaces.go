@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
+	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/gorilla/mux"
 )
 
@@ -22,10 +23,24 @@ func RegisterWorkspaceRoutes(r *mux.Route) {
 
 func WorkspacesListHandler() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ws := GetWorkspaceAccess(r.Context())
+		wss := GetWorkspaceAccess(r.Context())
+		lst := []workspace.WorkspaceGetRequest{}
+		usr := user.GetUser(r.Context())
+		for _, ws := range wss {
+			wsgr := workspace.WorkspaceGetRequest{Name: ws.Name, Description: ws.Description}
+			roles := []string{}
+			if ws.UserHasAccess(usr) {
+				roles = append(roles, "user")
+			}
+			if ws.UserHasAdminAccess(usr) {
+				roles = append(roles, "admin")
+			}
+			wsgr.Roles = roles
+			lst = append(lst, wsgr)
+		}
 
 		WriteResponse(w, http.StatusOK, nil, struct {
-			Items []workspace.Workspace `json:"items"`
-		}{Items: ws}, "workspace")
+			Items []workspace.WorkspaceGetRequest `json:"items"`
+		}{Items: lst}, "workspace")
 	})
 }
