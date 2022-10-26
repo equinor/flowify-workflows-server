@@ -20,11 +20,11 @@
         "inputMappings": [
           {
             "source": { "port": "mount-0" },
-            "target": { "node": "1", "port": "mount-a" }
+            "target": { "node": "a1", "port": "mount-a" }
           },
           {
             "source": { "port": "mount-1" },
-            "target": { "node": "1", "port": "mount-b" }
+            "target": { "node": "a1", "port": "mount-b" }
           }
         ],
         "nodes": [

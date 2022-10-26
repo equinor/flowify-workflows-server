@@ -13,6 +13,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/secret"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -445,15 +446,15 @@ func Test_TranspileVolume(t *testing.T) {
 func Test_TranspileGraphVolume(t *testing.T) {
 
 	raw, err := os.ReadFile("../models/examples/graph-input-volumes.json")
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	var job models.Job
 	err = json.Unmarshal(raw, &job)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	// transpile
 	argoWF, err := GetArgoWorkflow(job)
-	assert.Nil(t, err)
-	assert.NotNil(t, argoWF)
+	require.Nil(t, err)
+	require.NotNil(t, argoWF)
 
 	assert.Equal(t, 2, len(argoWF.Spec.Volumes), "we expect two volumes in config")
 	assert.Equal(t, "/opt/volumes/mount-a", argoWF.Spec.Templates[1].Container.VolumeMounts[0].MountPath, "mounted at specific paths")
