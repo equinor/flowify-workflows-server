@@ -11,6 +11,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/storage"
+	"github.com/equinor/flowify-workflows-server/user"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -75,7 +76,7 @@ func makeComponent(meta *models.Metadata) models.Component {
 
 func makeWorkflow(meta *models.Metadata, workspace string) models.Workflow {
 	if meta == nil {
-		meta = &models.Metadata{Name: "test-component",
+		meta = &models.Metadata{Name: "test-workflow",
 			ModifiedBy: models.ModifiedBy{Oid: "0", Email: "test@author.com"},
 			Timestamp:  time.Now().In(time.UTC).Truncate(time.Millisecond),
 			Uid:        models.NewComponentReference()}
@@ -95,7 +96,7 @@ func makeWorkflow(meta *models.Metadata, workspace string) models.Workflow {
 
 func makeJob(meta *models.Metadata, workspace string) models.Job {
 	if meta == nil {
-		meta = &models.Metadata{Name: "test-component",
+		meta = &models.Metadata{Name: "test-job",
 			ModifiedBy: models.ModifiedBy{Oid: "0", Email: "test@author.com"},
 			Timestamp:  time.Now().In(time.UTC).Truncate(time.Millisecond),
 			Uid:        models.NewComponentReference()}
@@ -167,7 +168,16 @@ func TestDeleteDocument(t *testing.T) {
 	mclient.Database(test_db_name).Drop(context.TODO())
 
 	ws_test := "ws-test"
-	authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: ws_test, HasAccess: true}})
+	mockUserAccess := user.MockUser{
+		Uid:   "0",
+		Email: "test@author.com",
+		Roles: []user.Role{"tester"},
+	}
+	mockUserNoAccess := mockUserAccess
+	mockUserNoAccess.Roles = []user.Role{"dummy"}
+	userNoAccessCtx := context.WithValue(context.TODO(), user.UserKey, mockUserNoAccess)
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, mockUserAccess)
+	authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: ws_test, Roles: [][]user.Role{{"tester"}}}})
 	cmp := makeComponent(nil)
 	{
 		// first add component to get
@@ -193,8 +203,8 @@ func TestDeleteDocument(t *testing.T) {
 		assert.Nil(t, err)
 	}
 
-	// cmp_v1, err := cstorage.GetComponent(context.TODO(), models.CRefVersion{Uid: cmp.Metadata.Uid, Version: models.VersionInit})
-	// assert.Nil(t, err)
+	_, err = cstorage.GetComponent(context.TODO(), models.CRefVersion{Uid: cmp.Metadata.Uid, Version: models.VersionInit})
+	assert.Nil(t, err)
 	cmp_v2, err := cstorage.GetComponent(context.TODO(), models.CRefVersion{Uid: cmp.Metadata.Uid, Version: models.VersionInit + 1})
 	assert.Nil(t, err)
 	wf_v1, err := cstorage.GetWorkflow(authzCtx, models.CRefVersion{Uid: wf.Metadata.Uid, Version: models.VersionInit})
@@ -219,7 +229,7 @@ func TestDeleteDocument(t *testing.T) {
 			Name:               "Delete component, bad uid",
 			Kind:               storage.ComponentKind,
 			Id:                 models.CRefVersion{},
-			AuthzContext:       context.TODO(),
+			AuthzContext:       authzCtx,
 			ExpectedResult:     models.CRefVersion{},
 			ErrorExpected:      true,
 			ExpectedDbDocCount: 2,
@@ -228,7 +238,7 @@ func TestDeleteDocument(t *testing.T) {
 			Name:               "Delete component v.2",
 			Kind:               storage.ComponentKind,
 			Id:                 models.CRefVersion{Uid: cmp_v2.Uid, Version: cmp_v2.Version.Current},
-			AuthzContext:       context.TODO(),
+			AuthzContext:       authzCtx,
 			ExpectedResult:     models.CRefVersion{Uid: cmp_v2.Uid, Version: cmp_v2.Version.Current},
 			ErrorExpected:      false,
 			ExpectedDbDocCount: 1,
@@ -237,7 +247,7 @@ func TestDeleteDocument(t *testing.T) {
 			Name:               "Delete workflow, no access",
 			Kind:               storage.WorkflowKind,
 			Id:                 models.CRefVersion{Uid: wf_v1.Uid, Version: wf_v1.Version.Current},
-			AuthzContext:       context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test", HasAccess: true}}),
+			AuthzContext:       userNoAccessCtx,
 			ExpectedResult:     models.CRefVersion{},
 			ErrorExpected:      true,
 			ExpectedDbDocCount: 2,
@@ -273,7 +283,7 @@ func TestDeleteDocument(t *testing.T) {
 			Name:               "Delete job, no access",
 			Kind:               storage.JobKind,
 			Id:                 models.CRefVersion{Uid: job.Uid},
-			AuthzContext:       context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test", HasAccess: true}}),
+			AuthzContext:       userNoAccessCtx,
 			ExpectedResult:     models.CRefVersion{},
 			ErrorExpected:      true,
 			ExpectedDbDocCount: 1,
@@ -295,6 +305,7 @@ func TestDeleteDocument(t *testing.T) {
 			if test.ErrorExpected {
 				assert.Error(t, err)
 			} else {
+				assert.NoError(t, err)
 				assert.Equal(t, test.ExpectedResult, result)
 			}
 			switch test.Kind {
@@ -524,29 +535,30 @@ func TestCreateWorkflow(t *testing.T) {
 		ExpectedError   error
 	}
 
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 	testCases := []testCase{
 		{Name: "No authz context",
 			WorkspaceAccess: []workspace.Workspace{{}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Good authz context",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedError:   nil},
 		{Name: "Authz context with name but no access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"dummy"}}}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Authz context with similar name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "tes", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Authz context with similar name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test ", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test ", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Authz context with subset name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "testt", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "testt", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 	}
@@ -558,10 +570,10 @@ func TestCreateWorkflow(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			log.Info("Test: ", test.Name, test.WorkspaceAccess, test.Workspace)
 
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, test.WorkspaceAccess)
 			wf := models.Workflow{Metadata: models.Metadata{Name: test.Name}, Component: makeComponent(nil), Workspace: test.Workspace}
 			err := cstorage.CreateWorkflow(authzCtx, wf)
-			assert.Equal(t, err, test.ExpectedError)
+			assert.Equal(t, test.ExpectedError, err)
 		})
 	}
 }
@@ -574,10 +586,11 @@ func TestGetWorkflow(t *testing.T) {
 		Metadata:  models.Metadata{Name: "test-wf", Uid: models.NewComponentReference(), Version: models.Version{Current: models.VersionInit, Tags: []string{"latest"}}},
 		Component: makeComponent(nil), Workspace: "test"}
 
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 	{
 		// create context with access
-		ws := []workspace.Workspace{{Name: "test", HasAccess: true}}
-		authCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, ws)
+		ws := []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}}
+		authCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, ws)
 		err := cstorage.CreateWorkflow(authCtx, wf)
 		assert.Nil(t, err)
 	}
@@ -593,21 +606,21 @@ func TestGetWorkflow(t *testing.T) {
 			WorkspaceAccess: []workspace.Workspace{{}},
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Good authz context",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   nil},
 		{Name: "Authz context with name but no access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test"}},
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Authz context with similar name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "tes", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, test.WorkspaceAccess)
 			wf_out, err := cstorage.GetWorkflow(authzCtx, wf.Metadata.Uid)
-			assert.Equal(t, err, test.ExpectedError)
+			assert.Equal(t, test.ExpectedError, err)
 			if err == nil {
 				// make sure the roundtrip works when auth is good
 				assert.Equal(t, wf, wf_out)
@@ -622,10 +635,11 @@ func TestPutWorkflow(t *testing.T) {
 
 	wf := models.Workflow{Metadata: models.Metadata{Name: "test-wf", Uid: models.NewComponentReference()}, Component: makeComponent(nil), Workspace: "test"}
 
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 	{
 		// create context with access
-		ws := []workspace.Workspace{{Name: "test", HasAccess: true}}
-		authCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, ws)
+		ws := []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}}
+		authCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, ws)
 		err := cstorage.CreateWorkflow(authCtx, wf)
 		assert.Nil(t, err)
 	}
@@ -640,27 +654,27 @@ func TestPutWorkflow(t *testing.T) {
 
 	testCases := []testCase{
 		{Name: "No authz context",
-			WorkspaceAccess: []workspace.Workspace{{}},
+			WorkspaceAccess: []workspace.Workspace{{Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedFail:    true,
 			ExpectedError:   errors.Wrap(fmt.Errorf("user has no access to workspace (%s)", "test"), "could not access workflow for storage")},
 		{Name: "Good authz context",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedFail:    false,
 			ExpectedError:   nil},
 		{Name: "Good authz context, try moving ws",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test2",
 			ExpectedFail:    true,
 			ExpectedError:   fmt.Errorf("cannot move workflows from workspace (%s)", "test")},
 		{Name: "Authz context with name but no access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"dummy"}}}},
 			Workspace:       "test",
 			ExpectedFail:    true,
 			ExpectedError:   errors.Wrap(fmt.Errorf("user has no access to workspace (%s)", "test"), "could not access workflow for storage")},
 		{Name: "Authz context with similar name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "tes", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedFail:    true,
 			ExpectedError:   errors.Wrap(fmt.Errorf("user has no access to workspace (%s)", "test"), "could not access workflow for storage")},
@@ -671,7 +685,7 @@ func TestPutWorkflow(t *testing.T) {
 			twf := wf
 			twf.Description = test.Name
 			twf.Workspace = test.Workspace
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, test.WorkspaceAccess)
 			err := cstorage.PutWorkflow(authzCtx, twf)
 			if test.ExpectedFail {
 				assert.NotNil(t, err)
@@ -687,6 +701,7 @@ func TestListWorkflows(t *testing.T) {
 	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
 	require.NoError(t, err)
 
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 	Day := time.Duration(time.Hour * 24)
 	Days := func(i int) time.Duration { return time.Duration(i) * Day }
 	{
@@ -695,7 +710,7 @@ func TestListWorkflows(t *testing.T) {
 
 		// first add components to list
 		for i := 0; i < 5; i++ {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test", HasAccess: true}})
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}})
 			err := cstorage.CreateWorkflow(authzCtx,
 				makeWorkflow(&models.Metadata{Name: fmt.Sprintf("test-%d", i),
 					ModifiedBy: models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}, Uid: models.NewComponentReference(),
@@ -703,7 +718,7 @@ func TestListWorkflows(t *testing.T) {
 			assert.Nil(t, err)
 		}
 		for i := 5; i < 10; i++ {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test-2", HasAccess: true}})
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: "test-2", Roles: [][]user.Role{{"tester"}}}})
 			err := cstorage.CreateWorkflow(authzCtx,
 				makeWorkflow(&models.Metadata{Name: fmt.Sprintf("test-%d", i),
 					ModifiedBy: models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}, Uid: models.NewComponentReference(),
@@ -711,7 +726,7 @@ func TestListWorkflows(t *testing.T) {
 			assert.Nil(t, err)
 		}
 		for i := 10; i < 15; i++ {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test-3", HasAccess: true}})
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: "test-3", Roles: [][]user.Role{{"tester"}}}})
 			err := cstorage.CreateWorkflow(authzCtx,
 				makeWorkflow(&models.Metadata{Name: fmt.Sprintf("test-%d", i),
 					ModifiedBy: models.ModifiedBy{Oid: "2", Email: "snow@google.com"}, Uid: models.NewComponentReference(),
@@ -742,49 +757,49 @@ func TestListWorkflows(t *testing.T) {
 		{Name: "Everything sorted chronologically ascending",
 			Filters:             nil,
 			Sorting:             []string{"+timestamp"},
-			WorkspaceAccess:     []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}},
+			WorkspaceAccess:     []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}, {Name: "test-2", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:       nil,
 			ExpectedSize:        10,
 			ExpectedFrontAuthor: "flow@flowify.io"},
 		{Name: "Everything sorted chronologically descending",
 			Filters:             nil,
 			Sorting:             []string{"-timestamp"},
-			WorkspaceAccess:     []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}},
+			WorkspaceAccess:     []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}, {Name: "test-2", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:       nil,
 			ExpectedSize:        10,
 			ExpectedFrontAuthor: "swirl@flowify.io"},
 		{Name: "Good authz context but only search for test ws",
 			Filters:             []string{"workspace[==]=test"},
 			Sorting:             nil,
-			WorkspaceAccess:     []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}},
+			WorkspaceAccess:     []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}, {Name: "test-2", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:       nil,
 			ExpectedSize:        5,
 			ExpectedFrontAuthor: "flow@flowify.io"},
 		{Name: "Good authz context (not test-3), regexp for test*, descending",
 			Filters:             []string{"workspace[search]=test.*"},
 			Sorting:             []string{"-timestamp"},
-			WorkspaceAccess:     []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}},
+			WorkspaceAccess:     []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}, {Name: "test-2", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:       nil,
 			ExpectedSize:        10,
 			ExpectedFrontAuthor: "swirl@flowify.io"},
 		{Name: "Good authz context sort by author",
 			Filters:             nil,
 			Sorting:             []string{"+modifiedBy"},
-			WorkspaceAccess:     []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}, {Name: "test-3", HasAccess: true}},
+			WorkspaceAccess:     []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}, {Name: "test-2", Roles: [][]user.Role{{"tester"}}}, {Name: "test-3", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:       nil,
 			ExpectedSize:        15,
 			ExpectedFrontAuthor: "flow@flowify.io"},
 		{Name: "Authz context with name but no access",
 			Filters:             nil,
 			Sorting:             nil,
-			WorkspaceAccess:     []workspace.Workspace{{Name: "test", HasAccess: false}},
+			WorkspaceAccess:     []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"dummy"}}}},
 			ExpectedError:       nil,
 			ExpectedSize:        0,
 			ExpectedFrontAuthor: ""},
 		{Name: "Authz context with similar name/access",
 			Filters:             []string{},
 			Sorting:             nil,
-			WorkspaceAccess:     []workspace.Workspace{{Name: "tes", HasAccess: true}},
+			WorkspaceAccess:     []workspace.Workspace{{Name: "tes", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:       nil,
 			ExpectedSize:        0,
 			ExpectedFrontAuthor: "",
@@ -793,7 +808,7 @@ func TestListWorkflows(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, test.WorkspaceAccess)
 			list, err := cstorage.ListWorkflowsMetadata(authzCtx, storage.Pagination{20, 0}, test.Filters, test.Sorting)
 			assert.Equal(t, err, test.ExpectedError)
 			assert.Equal(t, test.ExpectedSize, len(list.Items))
@@ -809,6 +824,7 @@ func TestListWorkflows(t *testing.T) {
 // Jobs
 
 func TestCreateJob(t *testing.T) {
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 
 	type testCase struct {
 		Name            string
@@ -819,27 +835,27 @@ func TestCreateJob(t *testing.T) {
 
 	testCases := []testCase{
 		{Name: "No authz context",
-			WorkspaceAccess: []workspace.Workspace{{}},
+			WorkspaceAccess: []workspace.Workspace{{Roles: [][]user.Role{{"dummy"}}}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Good authz context",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedError:   nil},
 		{Name: "Authz context with name but no access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"dummy"}}}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Authz context with similar name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "tes", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Authz context with similar name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test ", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test ", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Authz context with subset name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "testing", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "testing", Roles: [][]user.Role{{"tester"}}}},
 			Workspace:       "test",
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 	}
@@ -851,7 +867,7 @@ func TestCreateJob(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			log.Info("Test: ", test.Name, test.WorkspaceAccess, test.Workspace)
 
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, test.WorkspaceAccess)
 			job := models.Job{Metadata: models.Metadata{Name: "no uid"}, Workflow: models.Workflow{Metadata: models.Metadata{Name: test.Name}, Component: makeComponent(nil), Workspace: test.Workspace}}
 			err := cstorage.CreateJob(authzCtx, job)
 			assert.Equal(t, test.ExpectedError, err)
@@ -862,14 +878,15 @@ func TestCreateJob(t *testing.T) {
 func TestGetJob(t *testing.T) {
 	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
 	require.NoError(t, err)
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 
 	id := models.NewComponentReference()
 	name := "test-job-" + id.String()[:4]
 	job := models.Job{Metadata: models.Metadata{Name: name, Uid: id}, Workflow: models.Workflow{Metadata: models.Metadata{Name: "test-wf", Uid: models.NewComponentReference()}, Component: makeComponent(nil), Workspace: "test"}}
 	{
 		// create context with access
-		ws := []workspace.Workspace{{Name: "test", HasAccess: true}}
-		authCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, ws)
+		ws := []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}}
+		authCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, ws)
 		err := cstorage.CreateJob(authCtx, job)
 		assert.Nil(t, err)
 	}
@@ -885,19 +902,19 @@ func TestGetJob(t *testing.T) {
 			WorkspaceAccess: []workspace.Workspace{{}},
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Good authz context",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   nil},
 		{Name: "Authz context with name but no access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: false}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"dummy"}}}},
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 		{Name: "Authz context with similar name/access",
-			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "tes", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   fmt.Errorf("user has no access to workspace (%s)", "test")},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, test.WorkspaceAccess)
 			job_out, err := cstorage.GetJob(authzCtx, job.Metadata.Uid)
 			assert.Equal(t, err, test.ExpectedError)
 			if err == nil {
@@ -911,6 +928,7 @@ func TestGetJob(t *testing.T) {
 func TestListJobs(t *testing.T) {
 	cstorage, err := storage.NewMongoStorageClientFromConfig(cfg, mclient)
 	require.NoError(t, err)
+	userAccessCtx := context.WithValue(context.TODO(), user.UserKey, user.MockUser{Uid: "0", Email: "test@author.com", Roles: []user.Role{"tester"}})
 
 	Day := time.Duration(time.Hour * 24)
 	Days := func(i int) time.Duration { return time.Duration(i) * Day }
@@ -920,7 +938,7 @@ func TestListJobs(t *testing.T) {
 
 		// first add components to list
 		for i := 0; i < 5; i++ {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test", HasAccess: true}})
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}})
 			err := cstorage.CreateJob(authzCtx,
 				makeJob(&models.Metadata{Name: fmt.Sprintf("test-%d", i),
 					ModifiedBy: models.ModifiedBy{Oid: "0", Email: "flow@flowify.io"}, Uid: models.NewComponentReference(),
@@ -928,7 +946,7 @@ func TestListJobs(t *testing.T) {
 			assert.Nil(t, err)
 		}
 		for i := 5; i < 10; i++ {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test-2", HasAccess: true}})
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: "test-2", Roles: [][]user.Role{{"tester"}}}})
 			err := cstorage.CreateJob(authzCtx,
 				makeJob(&models.Metadata{Name: fmt.Sprintf("test-%d", i),
 					ModifiedBy: models.ModifiedBy{Oid: "1", Email: "swirl@flowify.io"}, Uid: models.NewComponentReference(),
@@ -936,7 +954,7 @@ func TestListJobs(t *testing.T) {
 			assert.Nil(t, err)
 		}
 		for i := 10; i < 15; i++ {
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, []workspace.Workspace{{Name: "test-3", HasAccess: true}})
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, []workspace.Workspace{{Name: "test-3", Roles: [][]user.Role{{"tester"}}}})
 			err := cstorage.CreateJob(authzCtx,
 				makeJob(&models.Metadata{Name: fmt.Sprintf("test-%d", i),
 					ModifiedBy: models.ModifiedBy{Oid: "0", Email: "snow@google.com"}, Uid: models.NewComponentReference(),
@@ -968,42 +986,42 @@ func TestListJobs(t *testing.T) {
 			Filters:         nil,
 			Sorting:         nil,
 			Pagination:      storage.Pagination{10, 0},
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   nil,
 			ExpectedSize:    5},
 		{Name: "All authz contexts",
 			Filters:         nil,
 			Sorting:         nil,
 			Pagination:      storage.Pagination{20, 0},
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}, {Name: "test-3", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}, {Name: "test-2", Roles: [][]user.Role{{"tester"}}}, {Name: "test-3", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   nil,
 			ExpectedSize:    15},
 		{Name: "All authz contexts, offset",
 			Filters:         nil,
 			Sorting:         nil,
 			Pagination:      storage.Pagination{10, 5},
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}, {Name: "test-3", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}, {Name: "test-2", Roles: [][]user.Role{{"tester"}}}, {Name: "test-3", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   nil,
 			ExpectedSize:    10},
 		{Name: "Good authz context and filter",
 			Filters:         []string{"workflow.workspace[==]=test-2"},
 			Sorting:         nil,
 			Pagination:      storage.Pagination{10, 0},
-			WorkspaceAccess: []workspace.Workspace{{Name: "test", HasAccess: true}, {Name: "test-2", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test", Roles: [][]user.Role{{"tester"}}}, {Name: "test-2", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   nil,
 			ExpectedSize:    5},
 		{Name: "Authz context with name but no access",
 			Filters:         nil,
 			Sorting:         nil,
 			Pagination:      storage.Pagination{10, 0},
-			WorkspaceAccess: []workspace.Workspace{{Name: "test-2", HasAccess: false}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "test-2", Roles: [][]user.Role{{"dummy"}}}},
 			ExpectedError:   nil,
 			ExpectedSize:    0},
 		{Name: "Authz context with similar name/access",
 			Filters:         []string{},
 			Sorting:         nil,
 			Pagination:      storage.Pagination{10, 0},
-			WorkspaceAccess: []workspace.Workspace{{Name: "tes", HasAccess: true}},
+			WorkspaceAccess: []workspace.Workspace{{Name: "tes", Roles: [][]user.Role{{"tester"}}}},
 			ExpectedError:   nil,
 			ExpectedSize:    0,
 		},
@@ -1012,13 +1030,13 @@ func TestListJobs(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.Name, func(t *testing.T) {
 			log.Info("Test: ", test.Name, test.WorkspaceAccess, test.ExpectedError)
-			authzCtx := context.WithValue(context.TODO(), workspace.WorkspaceKey, test.WorkspaceAccess)
+			authzCtx := context.WithValue(userAccessCtx, workspace.WorkspaceKey, test.WorkspaceAccess)
 			metaList, err := cstorage.ListJobsMetadata(authzCtx, test.Pagination, test.Filters, test.Sorting)
 			assert.Equal(t, err, test.ExpectedError)
 			assert.Equal(t, test.ExpectedSize, len(metaList.Items))
 			assert.GreaterOrEqual(t, metaList.PageInfo.TotalNumber, test.ExpectedSize, test.Name)
 			for _, j := range metaList.Items {
-				assert.Contains(t, test.WorkspaceAccess, workspace.Workspace{Name: j.Workspace, HasAccess: true})
+				assert.Contains(t, test.WorkspaceAccess, workspace.Workspace{Name: j.Workspace, Roles: [][]user.Role{{"tester"}}})
 			}
 		})
 	}

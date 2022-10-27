@@ -46,15 +46,34 @@ var (
 
 	wf1, _ = os.ReadFile("../models/examples/minimal-any-workflow.json")
 	wfReq  = []byte(fmt.Sprintf(`
-{
-	"options": {},
-	"workflow": %s
-}`, wf1))
+    {
+	    "options": {},
+	    "workflow": %s
+    }`, wf1))
 )
+
+// implement a mock workspace client
+type workspaceClient struct {
+	mock.Mock
+}
+
+func NewMockWorkspaceClient() *workspaceClient {
+	return &workspaceClient{}
+}
 
 // implement a mock client/db for testing
 type componentClient struct {
 	mock.Mock
+}
+
+func (c *workspaceClient) ListWorkspaces() []workspace.Workspace {
+	args := c.Called()
+	return args.Get(0).([]workspace.Workspace)
+}
+
+func (c *workspaceClient) GetNamespace() string {
+	args := c.Called()
+	return args.Get(0).(string)
 }
 
 func NewMockClient() *componentClient {
@@ -588,19 +607,56 @@ func Test_JobDeleteHandler(t *testing.T) {
 
 // Workspace client can be mocked using context injection
 func Test_WorkspacesHTTPHandler(t *testing.T) {
+	wss := []workspace.Workspace{
+		{Name: "test1", HideForUnauthorized: false, Roles: [][]user.Role{{"test-dev"}}},
+		{Name: "test2", HideForUnauthorized: true, Roles: [][]user.Role{{"test-dev"}}},
+		{Name: "test3", HideForUnauthorized: false, Roles: [][]user.Role{{"test3"}}},
+	}
+	client := NewMockWorkspaceClient()
+	client.On("ListWorkspaces").Return(wss)
+
 	mux := gmux.NewRouter()
+	mux.Use(NewAuthorizationContext(client))
 	RegisterWorkspaceRoutes(mux.PathPrefix("/api/v1"))
+	accessUser := user.MockUser{Uid: "0", Email: "test@author.com"}
 
 	type testCase struct {
 		Name        string
-		GivenAccess []workspace.Workspace
+		UserRoles   []user.Role
+		ExpectedWss []workspace.WorkspaceGetRequest
 	}
 
 	testcases := []testCase{
-		{Name: "list empty workspaces",
-			GivenAccess: []workspace.Workspace{}},
-		{Name: "list workspaces with access",
-			GivenAccess: []workspace.Workspace{{Name: "test", HasAccess: true, MissingRoles: nil}}},
+		{
+			Name:      "list visible workspaces (no access)",
+			UserRoles: []user.Role{"no-access"},
+			ExpectedWss: []workspace.WorkspaceGetRequest{
+				{Name: "test1", Roles: []string{}}, {Name: "test3", Roles: []string{}}},
+		},
+		{
+			Name:      "list workspaces with access test-dev (user only)",
+			UserRoles: []user.Role{"test-dev"},
+			ExpectedWss: []workspace.WorkspaceGetRequest{
+				{Name: "test1", Roles: []string{"user"}}, {Name: "test2", Roles: []string{"user"}}, {Name: "test3", Roles: []string{}}},
+		},
+		{
+			Name:      "list workspaces with access test3-admin",
+			UserRoles: []user.Role{"test3", "test3-admin"},
+			ExpectedWss: []workspace.WorkspaceGetRequest{
+				{Name: "test1", Roles: []string{}}, {Name: "test3", Roles: []string{"user", "admin"}}},
+		},
+		{
+			Name:      "list workspaces with access test-dev test3",
+			UserRoles: []user.Role{"test-dev", "test3"},
+			ExpectedWss: []workspace.WorkspaceGetRequest{
+				{Name: "test1", Roles: []string{"user"}}, {Name: "test2", Roles: []string{"user"}}, {Name: "test3", Roles: []string{"user"}}},
+		},
+		{
+			Name:      "list workspaces with access test-dev-admin test3-admin",
+			UserRoles: []user.Role{"test-dev", "test-dev-admin", "test3", "test3-admin"},
+			ExpectedWss: []workspace.WorkspaceGetRequest{
+				{Name: "test1", Roles: []string{"user", "admin"}}, {Name: "test2", Roles: []string{"user", "admin"}}, {Name: "test3", Roles: []string{"user", "admin"}}},
+		},
 	}
 
 	for _, test := range testcases {
@@ -618,7 +674,10 @@ func Test_WorkspacesHTTPHandler(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, "/api/v1/workspaces/", nil)
 			// inject test context here
 			ctx := request.Context()
-			ctx = context.WithValue(ctx, workspace.WorkspaceKey, test.GivenAccess)
+			usr := accessUser
+			usr.Roles = test.UserRoles
+			ctx = context.WithValue(ctx, user.UserKey, usr)
+			ctx = context.WithValue(ctx, workspace.WorkspaceKey, wss)
 			request = request.WithContext(ctx)
 
 			w := httptest.NewRecorder()
@@ -630,12 +689,12 @@ func Test_WorkspacesHTTPHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			type WorkspaceAccessList struct {
-				Items []workspace.Workspace `json:"items"`
+				Items []workspace.WorkspaceGetRequest `json:"items"`
 			}
 			ac := WorkspaceAccessList{}
 			err = json.Unmarshal(payload, &ac)
 			require.Nil(t, err)
-			require.Equal(t, test.GivenAccess, ac.Items, string(payload))
+			require.Equal(t, test.ExpectedWss, ac.Items)
 
 		})
 	}

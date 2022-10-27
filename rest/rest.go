@@ -225,12 +225,17 @@ func NewAuthorizationContext(wsclient workspace.WorkspaceClient) mux.MiddlewareF
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ws, err := wsclient.ListWorkspaces(r.Context(), user.GetUser(r.Context()))
-			if err != nil {
-				WriteErrorResponse(w, APIError{http.StatusInternalServerError, "error retrieving component", err.Error()}, "authzmiddleware")
-				return
+			wss := wsclient.ListWorkspaces()
+			usr := user.GetUser(r.Context())
+			aws := []workspace.Workspace{}
+			for _, ws := range wss {
+				aw := ws
+				hasAccess := aw.UserHasAccess(usr)
+				if hasAccess || !aw.HideForUnauthorized {
+					aws = append(aws, aw)
+				}
 			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), workspace.WorkspaceKey, ws)))
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), workspace.WorkspaceKey, aws)))
 		})
 	}
 }

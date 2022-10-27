@@ -70,19 +70,24 @@ const (
 	Volumes Subject = "volumes"
 )
 
-func (ra RoleAuthorizer) GetWorkspacePermissions(wsp string, usr user.User) (bool, bool, error) {
-	wss, err := ra.Workspaces.ListWorkspaces(context.TODO(), usr)
-	if err != nil {
-		return false, false, errors.Wrap(err, "could not get workspace permissions")
-	}
+type AccessLevel struct {
+	User  bool
+	Admin bool
+}
+
+func (ra RoleAuthorizer) GetWorkspacePermissions(wsp string, usr user.User) (AccessLevel, error) {
+	wss := ra.Workspaces.ListWorkspaces()
 
 	for _, ws := range wss {
+		var al AccessLevel
 		if ws.Name == wsp {
-			return ws.UserHasAccess(usr), ws.UserHasAdminAccess(usr), nil
+			al.User = ws.UserHasAccess(usr)
+			al.Admin = ws.UserHasAdminAccess(usr)
+			return al, nil
 		}
 	}
 
-	return false, false, nil
+	return AccessLevel{}, nil
 }
 
 func (ra RoleAuthorizer) GetSecretPermissions(usr user.User, data any) (map[Action]bool, error) {
@@ -93,16 +98,16 @@ func (ra RoleAuthorizer) GetSecretPermissions(usr user.User, data any) (map[Acti
 		return map[Action]bool{}, errors.Errorf("could not decode the workspace variable")
 	}
 
-	userAccess, adminAccess, err := ra.GetWorkspacePermissions(workspace, usr)
+	al, err := ra.GetWorkspacePermissions(workspace, usr)
 	if err != nil {
 		return map[Action]bool{}, errors.Wrap(err, "could not get secret permissions")
 	}
 
 	// this is where access levels map to actions.
-	p[Read] = userAccess || adminAccess
-	p[List] = userAccess || adminAccess
-	p[Write] = adminAccess
-	p[Delete] = adminAccess
+	p[Read] = al.User || al.Admin
+	p[List] = al.User || al.Admin
+	p[Write] = al.Admin
+	p[Delete] = al.Admin
 
 	return p, nil
 }
@@ -115,16 +120,16 @@ func (ra RoleAuthorizer) GetVolumePermissions(usr user.User, data any) (map[Acti
 		return map[Action]bool{}, errors.Errorf("could not decode the workspace variable")
 	}
 
-	userAccess, adminAccess, err := ra.GetWorkspacePermissions(workspace, usr)
+	al, err := ra.GetWorkspacePermissions(workspace, usr)
 	if err != nil {
 		return map[Action]bool{}, errors.Wrap(err, "could not get secret permissions")
 	}
 
 	// this is where access levels map to actions.
-	p[Read] = userAccess || adminAccess
-	p[List] = userAccess || adminAccess
-	p[Write] = adminAccess
-	p[Delete] = adminAccess
+	p[Read] = al.User || al.Admin
+	p[List] = al.Admin || al.User
+	p[Write] = al.Admin
+	p[Delete] = al.Admin
 
 	return p, nil
 }
