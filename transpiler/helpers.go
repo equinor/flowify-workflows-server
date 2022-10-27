@@ -52,8 +52,7 @@ func getNodeSecretMap(targetNodeId string, cmpSecrets secretMap, cmpInputs []mod
 	for _, m := range inputsMap {
 		mt, ok := checkInputType(cmpInputs, m.Source.Port)
 		if ok && mt == models.FlowifySecretType && m.Target.Node == targetNodeId {
-			k, _ := findKeyFor(nSecrets, m.Source.Port)
-			nSecrets[k] = m.Target.Port
+			nSecrets[m.Target.Port] = cmpSecrets[m.Source.Port]
 		}
 	}
 	return nSecrets
