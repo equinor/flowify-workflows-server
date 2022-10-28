@@ -72,9 +72,9 @@ func AddBrick(name string, cmp *models.Brick, outputs wfv1.Outputs, inputs wfv1.
 	container.Args = args
 	envs := []corev1.EnvVar{}
 	for k, e := range sMap {
-		s := corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: secret.DefaultObjectName}, Key: k}
+		s := corev1.SecretKeySelector{LocalObjectReference: corev1.LocalObjectReference{Name: secret.DefaultObjectName}, Key: e}
 		vf := corev1.EnvVarSource{SecretKeyRef: &s}
-		env := corev1.EnvVar{Name: e, ValueFrom: &vf}
+		env := corev1.EnvVar{Name: k, ValueFrom: &vf}
 		envs = append(envs, env)
 	}
 	container.Env = envs
@@ -155,7 +155,7 @@ func AddGraph(name string, cmp *models.Graph, outputs wfv1.Outputs, inputs wfv1.
 						errors.Errorf("Unrecognized implementation type: %s", impCmp)
 					}
 				case models.FlowifyVolumeType:
-					logrus.Info("Ref volume edge: ", e)
+					logrus.Debug("Ref volume edge:", e)
 				default:
 					return errors.Errorf("Unrecognized edge target-type, '%s', for target port-address '%s.%s'", it, e.Target.Node, e.Target.Port)
 				}
@@ -425,12 +425,11 @@ func TraverseComponent(cmp *models.Component, templates *[]wfv1.Template, tasks 
 			}
 			inParams = append(inParams, param)
 		case models.FlowifySecretType:
-			_, ok := findKeyFor(cmpSecrets, i.Name)
-			if !ok {
-				cmpSecrets[i.Name] = i.Name
+			if _, ok := cmpSecrets[i.Name]; !ok {
+				return nil, fmt.Errorf("missing secret <%s> for component: %s", i.Name, cmp.Uid)
 			}
 		case models.FlowifyVolumeType:
-			logrus.Info("Ref mount: ", i.Name, volumes[i.Name])
+			logrus.Debugf("Ref mount: %s %s", i.Name, volumes[i.Name])
 		default:
 			return nil, fmt.Errorf("cannot append input data (name: %s, type %s) at node %s", i.Name, i.Type, cmpName)
 		}
@@ -468,8 +467,7 @@ func TraverseComponent(cmp *models.Component, templates *[]wfv1.Template, tasks 
 			if mt, ok := checkInputType(cmp.Inputs, m.Source.Port); ok {
 				switch mt {
 				case models.FlowifySecretType:
-					k, _ := findKeyFor(nodeSecrets, m.Source.Port)
-					nodeSecrets[k] = m.Target.Port
+					nodeSecrets[m.Target.Port] = cmpSecrets[m.Source.Port]
 				case models.FlowifyVolumeType:
 					if val, ok := volumes[m.Source.Port]; ok {
 						nodeVolumes[m.Target.Port] = val
@@ -508,12 +506,11 @@ func TraverseComponent(cmp *models.Component, templates *[]wfv1.Template, tasks 
 			if mt, ok := checkInputType(cmp.Inputs, m.Source.Port); ok {
 				switch mt {
 				case models.FlowifySecretType:
-					k, _ := findKeyFor(nodeSecrets, m.Source.Port)
-					nodeSecrets[k] = m.Target.Port
+					nodeSecrets[m.Target.Port] = cmpSecrets[m.Source.Port]
 				case models.FlowifyVolumeType:
 					if val, ok := volumes[m.Source.Port]; ok {
 						nodeVolumes[m.Target.Port] = val
-						logrus.Infof("Rewriting nodeVolumes for %s: %s -> %s", cmp.Name, m.Source.Port, m.Target.Port)
+						logrus.Debugf("Rewriting nodeVolumes for %s: %s -> %s", cmp.Name, m.Source.Port, m.Target.Port)
 					}
 				}
 			}
@@ -538,7 +535,7 @@ func TraverseComponent(cmp *models.Component, templates *[]wfv1.Template, tasks 
 							scopeVolumes[m.Target.Node] = make(map[string]corev1.Volume, 0)
 						}
 						scopeVolumes[m.Target.Node][m.Target.Port] = val
-						logrus.Infof("Rewriting nodeVolumes for %s: %s -> %s", cmp.Name, m.Source.Port, m.Target.Port)
+						logrus.Debugf("Rewriting nodeVolumes for %s: %s -> %s", cmp.Name, m.Source.Port, m.Target.Port)
 					}
 				}
 			}
@@ -551,17 +548,17 @@ func TraverseComponent(cmp *models.Component, templates *[]wfv1.Template, tasks 
 			}
 			nodeSecrets := getNodeSecretMap(c.Id, cmpSecrets, cmp.Inputs, impCmp.InputMappings)
 			volumes := getConnectedVolumeMap(c.Id, &tc, impCmp.Edges, impCmp.Nodes, scopeVolumes)
-			logrus.Info(volumes)
+			logrus.Debug(volumes)
 			_, err := TraverseComponent(&tc, templates, tasks, nodeSecrets, volumes)
 			if err != nil {
 				return nil, err
 			}
 		}
 	case models.Brick:
-		for k, elem := range cmpSecrets {
+		for k, _ := range cmpSecrets {
 			ex := false
 			for _, i := range cmp.Inputs {
-				if elem == i.Name {
+				if k == i.Name {
 					ex = true
 					break
 				}
@@ -605,14 +602,19 @@ func GetArgoWorkflow(job models.Job) (*wfv1.Workflow, error) {
 	secretMapValues := make(secretMap)
 	for _, cmpInput := range wf.Component.Inputs {
 		if cmpInput.Type == models.FlowifySecretType {
+			missing := true
 			for _, jobInput := range job.InputValues {
 				if cmpInput.Name == jobInput.Target {
 					val, ok := jobInput.Value.(string)
 					if !ok {
 						return nil, errors.Errorf("Cannot convert flowify secret '%s' to string.", jobInput.Target)
 					}
-					secretMapValues[val] = cmpInput.Name
+					secretMapValues[cmpInput.Name] = val
+					missing = false
 				}
+			}
+			if missing {
+				return nil, errors.Errorf("Missing input secret <%s> for job: %s", cmpInput.Name, job.Name)
 			}
 		}
 	}
@@ -637,7 +639,7 @@ func GetArgoWorkflow(job models.Job) (*wfv1.Workflow, error) {
 					if err != nil {
 						return nil, err
 					}
-					logrus.Infof("Appending volume from config: %s -> (%s) ", config, v.Target)
+					logrus.Debugf("Appending volume from config: %s -> (%s) ", config, v.Target)
 					volumeMap[tgt.Name] = volume // add volume with top level input name
 				} else {
 					return nil, fmt.Errorf("mount config must be json encoded string")

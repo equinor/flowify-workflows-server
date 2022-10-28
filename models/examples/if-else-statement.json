@@ -5,6 +5,14 @@
         {
             "value": "10",
             "target": "max"
+        },
+        {
+          "value": "SECRET_PASS",
+          "target": "secretL1"
+        },
+        {
+          "value": "SECRET_PASS",
+          "target": "secretL2"
         }
     ],
     "workflow":
@@ -18,7 +26,9 @@
             "uid": "192161d7-e3f2-4991-adc0-a99c88c144c0",
             "description": "Graph component",
             "inputs": [
-                { "name": "max", "mediatype": ["integer"], "type": "parameter" }
+                { "name": "max", "mediatype": ["integer"], "type": "parameter" },
+                { "name": "secretL1", "type": "env_secret" },
+                { "name": "secretL2", "type": "env_secret" }
             ],
             "outputs": [
                 { "name": "description", "type": "parameter" }
@@ -30,6 +40,14 @@
                     {
                         "source": { "port": "max" },
                         "target": { "node": "N1", "port": "value" }
+                    },
+                    {
+                      "source": { "port": "secretL1" },
+                      "target": { "node": "N1", "port": "secretB1" }
+                    },
+                    {
+                      "source": { "port": "secretL2" },
+                      "target": { "node": "If", "port": "secretPass" }
                     }
                 ],
                 "outputMappings": [
@@ -46,7 +64,8 @@
                             "uid": "192161d7-e3f2-4991-adc0-a99c88c144b0",
                             "description": "Generate",
                             "inputs": [
-                                { "name": "value", "type": "parameter" }
+                                { "name": "value", "type": "parameter" },
+                                { "name": "secretB1", "type": "env_secret" }
                             ],
                             "outputs": [
                                 { "name": "rand", "type": "parameter" }
@@ -57,7 +76,7 @@
                                 "container": {
                                     "name": "containername_n1_b1",
                                     "image": "bash:latest",
-                                    "command": ["bash", "-c", "shuf -i 0-$0 -n1 > /tmp/out"],
+                                    "command": ["bash", "-c", "echo SecretB1 $secretB1; shuf -i 0-$0 -n1 > /tmp/out"],
                                     "args": []
                                 },
                                 "args": [
@@ -85,7 +104,8 @@
                                     "name": "valFromParam",
                                     "mediatype": ["number"],
                                     "type": "parameter"
-                                }
+                                },
+                                { "name": "secretPass", "type": "env_secret" }
                             ],
                             "outputs": [
                                 { "name": "ifOut", "type": "parameter" }
@@ -97,6 +117,10 @@
                                     {
                                         "source": { "port": "valFromParam" },
                                         "target": { "port": "valParam" }
+                                    },
+                                    {
+                                        "source": { "port": "secretPass" },
+                                        "target": { "port": "envValue" }
                                     }
                                 ],
                                 "outputMappings": [
@@ -113,6 +137,10 @@
                                             "name": "valParam",
                                             "mediatype": ["number"],
                                             "type": "parameter"
+                                        },
+                                        {
+                                            "name": "envValue",
+                                            "type": "env_secret"
                                         }
                                     ],
                                     "outputs": [
@@ -127,7 +155,7 @@
                                             "command": [
                                                 "sh",
                                                 "-c",
-                                                "echo value $0 is huge > /tmp/out"
+                                                "echo env $envValue; echo value $0 is huge > /tmp/out"
                                             ],
                                             "args": []
                                         },
@@ -153,6 +181,10 @@
                                             "name": "valParam",
                                             "mediatype": ["number"],
                                             "type": "parameter"
+                                        },
+                                        {
+                                            "name": "envValue",
+                                            "type": "env_secret"
                                         }
                                     ],
                                     "outputs": [
@@ -167,7 +199,7 @@
                                             "command": [
                                                 "sh",
                                                 "-c",
-                                                "echo value $0 is small > /tmp/out"
+                                                "echo env $envValue; echo value $0 is small > /tmp/out"
                                             ],
                                             "args": []
                                         },

@@ -187,6 +187,8 @@ const (
 	}`
 )
 
+var secrets = secretMap{"secretWF1": "wf1_secret_value", "secretWF2": "wf2_secret_value"}
+
 func init() {
 }
 
@@ -202,7 +204,7 @@ func Test_ParseComponentTree(t *testing.T) {
 	assert.Equal(t, 3, len(wf.Component.Inputs))
 	assert.Equal(t, 0, len(wf.Component.Outputs))
 
-	argoWF, err := ParseComponentTree(wf, secretMap{}, volumeMap{}, map[string]string{}, map[string]string{})
+	argoWF, err := ParseComponentTree(wf, secrets, volumeMap{}, map[string]string{}, map[string]string{})
 	assert.Nil(t, err)
 	assert.True(t, len(argoWF.Spec.Templates) == 4, "Expected no. of templates is 4.")
 	// assert.Equal(t, "seedWF", argoWF.Spec.Arguments.Parameters[0].Name)
@@ -222,9 +224,9 @@ func Test_ParseComponentTree(t *testing.T) {
 			for _, env := range template.Container.Env {
 				switch env.Name {
 				case "secretN1":
-					assert.Equal(t, "secretWF1", env.ValueFrom.SecretKeyRef.Key)
+					assert.Equal(t, secrets["secretWF1"], env.ValueFrom.SecretKeyRef.Key)
 				case "secretN2":
-					assert.Equal(t, "secretWF2", env.ValueFrom.SecretKeyRef.Key)
+					assert.Equal(t, secrets["secretWF2"], env.ValueFrom.SecretKeyRef.Key)
 				default:
 					t.Errorf("Unexpected secret %s in brick %s.", env.Name, template.Name)
 				}
@@ -232,7 +234,7 @@ func Test_ParseComponentTree(t *testing.T) {
 		case "192161d7-e3f2-4991-adc0-a99c88c144b2":
 			assert.Equal(t, 1, len(template.Container.Env))
 			assert.Equal(t, "secretN1", template.Container.Env[0].Name)
-			assert.Equal(t, "secretWF2", template.Container.Env[0].ValueFrom.SecretKeyRef.Key)
+			assert.Equal(t, secrets["secretWF2"], template.Container.Env[0].ValueFrom.SecretKeyRef.Key)
 		default:
 			t.Errorf("Unexpected template %s.", template.Name)
 		}
@@ -244,7 +246,8 @@ func Test_RemoveDuplicatedTemplates(t *testing.T) {
 	err := json.Unmarshal([]byte(minimalExampleJSON), &wf)
 	assert.Nil(t, err)
 
-	job := models.Job{Metadata: models.Metadata{Description: "test job"}, Type: "job", InputValues: nil, Workflow: wf}
+	inputValues := []models.Value{{Value: secrets["secretWF1"], Target: "secretWF1"}, {Value: secrets["secretWF2"], Target: "secretWF2"}}
+	job := models.Job{Metadata: models.Metadata{Description: "test job"}, Type: "job", InputValues: inputValues, Workflow: wf}
 	argoWF, err := GetArgoWorkflow(job)
 	assert.Nil(t, err)
 	assert.True(t, len(argoWF.Spec.Templates) == 3, "Expected no. of templates is 3.")
