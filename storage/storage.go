@@ -33,6 +33,8 @@ type ComponentClient interface {
 	CreateJob(ctx context.Context, node models.Job) error
 
 	DeleteDocument(ctx context.Context, kind DocumentKind, id models.CRefVersion) (models.CRefVersion, error)
+
+	AddJobEvents(ctx context.Context, id models.ComponentReference, events []models.JobEvent) error
 }
 
 var (

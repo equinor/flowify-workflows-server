@@ -1185,6 +1185,8 @@ func (c *MongoStorageClient) GetJob(ctx context.Context, id models.ComponentRefe
 	var result models.Job
 	filter := bson.D{{Key: "uid", Value: id}}
 	err := coll.FindOne(ctx, filter).Decode(&result)
+	// opts := options.FindOne().SetProjection(bson.D{bson.E{Key: "events", Value: 0}}) // skip events
+	// err := coll.FindOne(ctx, filter, opts).Decode(&result)
 
 	if err == mongo.ErrNoDocuments {
 		return result, ErrNotFound
@@ -1330,4 +1332,19 @@ func (c *MongoStorageClient) ListJobsMetadata(ctx context.Context, pagination Pa
 	}
 
 	return result, nil
+}
+
+func (c *MongoStorageClient) AddJobEvents(ctx context.Context, id models.ComponentReference, events []models.JobEvent) error {
+
+	filter := bson.D{
+		bson.E{Key: "uid", Value: id},
+	}
+	update := bson.D{
+		bson.E{Key: "$set", Value: bson.D{bson.E{Key: "events", Value: events}}},
+	}
+	coll := c.selectGetter(JobKind)()
+
+	_, err := coll.UpdateOne(ctx, filter, update)
+
+	return err
 }

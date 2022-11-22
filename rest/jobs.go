@@ -11,6 +11,7 @@ import (
 
 	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	argoclient "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
+	v1a1 "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned/typed/workflow/v1alpha1"
 	"github.com/argoproj/argo-workflows/v3/workflow/util"
 	"github.com/equinor/flowify-workflows-server/models"
 	"github.com/equinor/flowify-workflows-server/storage"
@@ -59,6 +60,7 @@ func RegisterJobRoutes(r *mux.Route, componentClient storage.ComponentClient, ar
 	s1.HandleFunc("/{id}", JobGetHandler(componentClient)).Methods(http.MethodGet)
 	s1.HandleFunc("/{id}", JobDeleteHandler(componentClient, argoclient)).Methods(http.MethodDelete)
 	s1.HandleFunc("/{id}/terminate", JobTerminateHandler(argoclient)).Methods(http.MethodPost)
+	s1.HandleFunc("/{id}/status", JobStatusHandler(argoclient)).Methods(http.MethodGet)
 
 	// now add the wildcard paths
 	s2 := s.PathPrefix("/{id}/events/").Subrouter()
@@ -149,7 +151,8 @@ func JobsSubmitHandler(componentClient storage.ComponentClient, argoclient argoc
 			argoWf.SetAnnotations(map[string]string{"flowify.io/tags": strings.Join(request.SubmitOptions.Tags, ";")})
 		}
 		rwf := job.Workflow
-		_, err = argoclient.ArgoprojV1alpha1().Workflows(rwf.Workspace).Create(r.Context(), argoWf, metav1.CreateOptions{})
+		wfi := argoclient.ArgoprojV1alpha1().Workflows(rwf.Workspace)
+		_, err = wfi.Create(r.Context(), argoWf, metav1.CreateOptions{})
 
 		if err != nil {
 			// TODO: work this out more detailed
@@ -165,10 +168,53 @@ func JobsSubmitHandler(componentClient storage.ComponentClient, argoclient argoc
 			return
 		}
 
+		go EventSaver(context.TODO(), wfi, job.Uid, componentClient)
+
 		locHeader := map[string]string{"Location": path.Join("/api/v1/jobs/", job.Metadata.Uid.String())}
 		//WriteResponseAndHeaders(w, http.StatusCreated, locHeader, []byte(`{}`))
 		WriteResponse(w, http.StatusCreated, locHeader, nil, "submitJob")
 	})
+}
+
+func EventSaver(ctx context.Context, wfi v1a1.WorkflowInterface, jobid models.ComponentReference, storageClient storage.ComponentClient) {
+	watch, _ := wfi.Watch(ctx, metav1.ListOptions{FieldSelector: GetFieldnameSelector(jobid.String())})
+	defer watch.Stop()
+
+	events := []models.JobEvent{}
+
+loop:
+	for {
+		select {
+		case event, open := <-watch.ResultChan():
+			if !open {
+				log.Error(fmt.Sprintf("cannot monitor events for job %s, monitoring channel closed", jobid.String()))
+			}
+
+			wf, ok := event.Object.(*wfv1.Workflow)
+			if !ok {
+				// object is probably metav1.Status, `FromObject` can deal with anything
+				log.Warnf("job %s event error: ", jobid, apierr.FromObject(event.Object).Error())
+			}
+
+			events = append(events, models.JobEvent(*wf))
+
+			if wf.Status.Phase.Completed() {
+				watch.Stop()
+				break loop
+			}
+		case <-ctx.Done():
+			break loop
+		}
+	}
+
+	if len(events) > 0 {
+		err := storageClient.AddJobEvents(ctx, jobid, events)
+		if err != nil {
+			log.Error(errors.Wrapf(err, "can not save job %s events", jobid.String()))
+		} else {
+			log.Infof("Job %s events saved", jobid.String())
+		}
+	}
 }
 
 func JobDeleteHandler(storageClient storage.ComponentClient, argoclient argoclient.Interface) http.HandlerFunc {
@@ -215,7 +261,7 @@ func JobTerminateHandler(argoClient argoclient.Interface) http.HandlerFunc {
 
 		workspace, err := getWorkspaceByJobUID(r.Context(), argoClient, id)
 		if err != nil {
-			WriteErrorResponse(w, APIError{http.StatusNotFound, err.Error(), fmt.Sprintf("workspace for job %s not found", id.String())}, "deleteJob")
+			WriteErrorResponse(w, APIError{http.StatusNotFound, err.Error(), fmt.Sprintf("workspace for job %s not found", id.String())}, "terminateJob")
 			return
 		}
 
@@ -253,7 +299,6 @@ func JobsEventstreamHandler(componentClient storage.ComponentClient, argoclient 
 
 		workspace := jobs.Items[0].GetNamespace()
 		watch, err := CreateWorkflowWatch(r.Context(), argoclient, jobid, workspace)
-
 		if err != nil {
 			log.Errorf("cannot obtain workflow watch for %s/%s: %s", jobid, workspace, err.Error())
 			WriteErrorResponse(w, APIError{http.StatusServiceUnavailable, "error getting a running job watch", err.Error()}, "jobEvent")
@@ -265,7 +310,6 @@ func JobsEventstreamHandler(componentClient storage.ComponentClient, argoclient 
 		w.Header().Set("Connection", "keep-alive")
 		defer watch.Stop()
 		err = StartEventLoop(r.Context(), watch, w)
-
 		if err != nil {
 			log.Error(errors.Wrapf(err, "cannot send events for job %s", jobid))
 			w.Header().Set("Content-Type", "application/json") // back to json
@@ -273,6 +317,34 @@ func JobsEventstreamHandler(componentClient storage.ComponentClient, argoclient 
 			WriteErrorResponse(w, APIError{http.StatusServiceUnavailable, "error monitoring job events", err.Error()}, "jobEvent")
 			return
 		}
+	})
+}
+
+func JobStatusHandler(argoclient argoclient.Interface) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, err := getIdFromMuxerPath(r)
+		if err != nil {
+			WriteErrorResponse(w, APIError{http.StatusBadRequest, err.Error(), ""}, "statusJob")
+			return
+		}
+
+		workspace, err := getWorkspaceByJobUID(r.Context(), argoclient, id)
+		if err != nil {
+			WriteErrorResponse(w, APIError{http.StatusNotFound, err.Error(), fmt.Sprintf("workspace for job %s not found", id.String())}, "statusJob")
+			return
+		}
+
+		job, err := argoclient.ArgoprojV1alpha1().Workflows(workspace).Get(r.Context(), id.String(), metav1.GetOptions{})
+		if err != nil {
+			WriteErrorResponse(w, APIError{http.StatusNotFound, fmt.Sprintf("job not found: %s", id.String()), ""}, "statusJob")
+			return
+		}
+		jobStatus := models.JobStatus{
+			Uid:    id,
+			Status: job.Status.Phase,
+		}
+
+		WriteResponse(w, http.StatusOK, nil, jobStatus, "statusJob")
 	})
 }
 
@@ -332,6 +404,10 @@ func StartEventLoop(ctx context.Context, watch watch.Interface, w io.Writer) err
 
 			if err != nil {
 				return errors.Wrapf(err, "cannot write workflow to SSE stream")
+			}
+			if wf.Status.Phase.Completed() {
+				watch.Stop()
+				return nil
 			}
 		case <-ctx.Done():
 			return nil
