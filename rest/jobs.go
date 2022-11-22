@@ -193,7 +193,7 @@ loop:
 			wf, ok := event.Object.(*wfv1.Workflow)
 			if !ok {
 				// object is probably metav1.Status, `FromObject` can deal with anything
-				log.Warnf("job %s event error: ", jobid, apierr.FromObject(event.Object).Error())
+				log.Warnf("job %s event error: %s", jobid, apierr.FromObject(event.Object).Error())
 			}
 
 			events = append(events, models.JobEvent(*wf))
