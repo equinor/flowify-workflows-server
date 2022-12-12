@@ -17,6 +17,11 @@
     },
     "workflow": {
       "$ref": "workflow.schema.json"
+    },
+    "events": {
+      "description": "The list of events registered while job was run.",
+      "type": "array",
+      "minItems": 0
     }
   },
   "unevaluatedProperties": false,

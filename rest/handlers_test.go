@@ -185,6 +185,11 @@ func (c *componentClient) PatchWorkflow(ctx context.Context, node models.Workflo
 	return args.Get(0).(models.Workflow), args.Error(1)
 }
 
+func (c *componentClient) AddJobEvents(ctx context.Context, id models.ComponentReference, events []models.JobEvent) error {
+	args := c.Called(ctx, id, events)
+	return args.Error(1)
+}
+
 type testCase struct {
 	Name                       string
 	Method                     string

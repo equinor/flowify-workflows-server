@@ -1,0 +1,16 @@
+{
+    "type": "object",
+    "properties": {
+      "uid": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "pattern": "^(Pending|Running|Succeeded|Failed|Error)$",
+        "description": "Job status (Pending/Running/Succeeded/Failed/Error). Completed job indicated by on of the: Succeeded/Failed/Error"
+      }
+    },
+    "unevaluatedProperties": false,
+    "required": ["uid", "status"]
+  }
+  

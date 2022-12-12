@@ -1084,6 +1084,11 @@
         "summary": "Terminate a job",
         "tags": ["Jobs"],
         "operationId": "terminateJob",
+        "parameters": [
+          {
+            "$ref": "cref.schema.json"
+          }
+        ],
         "responses": {
           "202": {
             "description": "Job termination started",
@@ -1103,6 +1108,30 @@
           },
           "default": {
             "$ref": "#/components/responses/500"
+          }
+        }
+      }
+    },
+    "/jobs/{id}/status": {
+      "get": {
+        "summary": "Get the job status",
+        "tags": ["Jobs"],
+        "operationId": "statusJob",
+        "parameters": [
+          {
+            "$ref": "cref.schema.json"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "jobstatus.schema.json"
+                }
+              }
+            }
           }
         }
       }
