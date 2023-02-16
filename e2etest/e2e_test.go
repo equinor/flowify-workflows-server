@@ -13,10 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/equinor/flowify-workflows-server/apiserver"
-	"github.com/equinor/flowify-workflows-server/models"
-	fuser "github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -27,6 +25,10 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/equinor/flowify-workflows-server/apiserver"
+	"github.com/equinor/flowify-workflows-server/models"
+	fuser "github.com/equinor/flowify-workflows-server/user"
 )
 
 type e2eTestSuite struct {
@@ -367,6 +369,17 @@ func (s *e2eTestSuite) Test_Roundtrip_Component() {
 	s.NoError(err)
 	s.Equal(cmpResp, cmpResp2, "expect roundtrip equality")
 
+}
+
+func (s *e2eTestSuite) TestWorkspaceCreate() {
+	requestor := make_authenticated_requestor(s.client, mockUser)
+
+	id := uuid.New()
+	body := fmt.Sprintf("{\"Name\":\"new-workspace-%s\", \"Roles\":[\"sandbox-developer\"]}", id.String())
+
+	resp, err := requestor(server_addr+"/api/v1/workspaces/", http.MethodPost, body)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), http.StatusCreated, resp.StatusCode)
 }
 
 func (s *e2eTestSuite) Test_Roundtrip_Workflow() {
