@@ -2,6 +2,7 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -62,7 +63,6 @@ type WorkspaceCreateInputData struct {
 }
 
 func WorkspacesCreateHandler() http.HandlerFunc {
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var creationData WorkspaceCreateInputData
 		err := json.NewDecoder(r.Body).Decode(&creationData)
@@ -92,8 +92,19 @@ func WorkspacesCreateHandler() http.HandlerFunc {
 			WriteResponse(w, http.StatusInternalServerError, nil, nil, "workspace")
 		}
 
-		var strBuffer bytes.Buffer
+		nsName := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: creationData.Name,
+			},
+		}
+		_, err = clientset.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
+		if err != nil {
+			WriteResponse(w, http.StatusInternalServerError, nil, struct {
+				Error string
+			}{Error: fmt.Sprintf("Error %s", err)}, "workspace")
+		}
 
+		var strBuffer bytes.Buffer
 		strBuffer.WriteString("[")
 		for _, role := range creationData.Roles {
 			strBuffer.WriteString("\"")
@@ -120,12 +131,11 @@ func WorkspacesCreateHandler() http.HandlerFunc {
 		}
 
 		CMOpt := metav1.CreateOptions{}
-
 		_, err = clientset.CoreV1().ConfigMaps("argo").Create(r.Context(), &cm, CMOpt)
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
-			}{Error: fmt.Sprintf("error getting user home dir: %v\n", err)}, "workspace")
+			}{Error: fmt.Sprintf("error creating configMap: %v\n", err)}, "workspace")
 		}
 
 		WriteResponse(w, http.StatusCreated, nil, struct {
