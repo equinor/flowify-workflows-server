@@ -128,7 +128,7 @@ func WorkspacesCreateHandler() http.HandlerFunc {
 			}{Error: fmt.Sprintf("error getting user home dir: %v\n", err)}, "workspace")
 		}
 
-		WriteResponse(w, http.StatusOK, nil, struct {
+		WriteResponse(w, http.StatusCreated, nil, struct {
 			Workspace string
 		}{
 			Workspace: fmt.Sprintf("The Workspace has been created %s", creationData.Name),
