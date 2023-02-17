@@ -6,20 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"github.com/gorilla/mux"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/user"
 )
 
-func RegisterWorkspaceRoutes(r *mux.Route) {
+func RegisterWorkspaceRoutes(r *mux.Route, k8sclient kubernetes.Interface) {
 	s := r.Subrouter()
 
 	const intype = "application/json"
@@ -30,7 +27,7 @@ func RegisterWorkspaceRoutes(r *mux.Route) {
 	s.Use(SetContentTypeMiddleware(outtype))
 
 	s.HandleFunc("/workspaces/", WorkspacesListHandler()).Methods(http.MethodGet)
-	s.HandleFunc("/workspaces/", WorkspacesCreateHandler()).Methods(http.MethodPost)
+	s.HandleFunc("/workspaces/", WorkspacesCreateHandler(k8sclient)).Methods(http.MethodPost)
 }
 
 func WorkspacesListHandler() http.HandlerFunc {
@@ -62,7 +59,7 @@ type WorkspaceCreateInputData struct {
 	Roles []string
 }
 
-func WorkspacesCreateHandler() http.HandlerFunc {
+func WorkspacesCreateHandler(k8sclient kubernetes.Interface) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var creationData WorkspaceCreateInputData
 		err := json.NewDecoder(r.Body).Decode(&creationData)
@@ -72,32 +69,12 @@ func WorkspacesCreateHandler() http.HandlerFunc {
 			}{Error: fmt.Sprintf("error decoding the input data: %v\n", err)}, "workspace")
 		}
 
-		userHomeDir, err := os.UserHomeDir()
-		if err != nil {
-			WriteResponse(w, http.StatusInternalServerError, nil, struct {
-				Error string
-			}{Error: fmt.Sprintf("error getting user home dir: %v\n", err)}, "workspace")
-		}
-		kubeConfigPath := filepath.Join(userHomeDir, ".kube", "config")
-
-		config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
-		if err != nil {
-			WriteResponse(w, http.StatusInternalServerError, nil, struct {
-				Error string
-			}{Error: fmt.Sprintf("Error %s", err)}, "workspace")
-		}
-
-		clientset, err := kubernetes.NewForConfig(config)
-		if err != nil {
-			WriteResponse(w, http.StatusInternalServerError, nil, nil, "workspace")
-		}
-
 		nsName := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: creationData.Name,
 			},
 		}
-		_, err = clientset.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
+		_, err = k8sclient.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
@@ -131,7 +108,7 @@ func WorkspacesCreateHandler() http.HandlerFunc {
 		}
 
 		CMOpt := metav1.CreateOptions{}
-		_, err = clientset.CoreV1().ConfigMaps("argo").Create(r.Context(), &cm, CMOpt)
+		_, err = k8sclient.CoreV1().ConfigMaps("argo").Create(r.Context(), &cm, CMOpt)
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string

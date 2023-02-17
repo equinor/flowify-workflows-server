@@ -118,7 +118,7 @@ func RegisterRoutes(r *mux.Route,
 	RegisterOpenApiRoutes(subrouter.PathPrefix("/spec"))
 	RegisterUserInfoRoutes(subrouter.PathPrefix(""))
 	RegisterComponentRoutes(subrouter.PathPrefix(""), componentClient)
-	RegisterWorkspaceRoutes(subrouter.PathPrefix(""))
+	RegisterWorkspaceRoutes(subrouter.PathPrefix(""), k8sclient)
 
 	// the following handlers below will use the authorized context's WorkspaceAccess
 	RegisterWorkflowRoutes(subrouter.PathPrefix(""), componentClient)
