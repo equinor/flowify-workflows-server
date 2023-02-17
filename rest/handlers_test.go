@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"k8s.io/client-go/kubernetes"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -622,7 +623,8 @@ func Test_WorkspacesHTTPHandler(t *testing.T) {
 
 	mux := gmux.NewRouter()
 	mux.Use(NewAuthorizationContext(client))
-	RegisterWorkspaceRoutes(mux.PathPrefix("/api/v1"))
+	var k8sclient kubernetes.Interface
+	RegisterWorkspaceRoutes(mux.PathPrefix("/api/v1"), k8sclient)
 	accessUser := user.MockUser{Uid: "0", Email: "test@author.com"}
 
 	type testCase struct {
