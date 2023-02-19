@@ -16,7 +16,7 @@ import (
 	"github.com/equinor/flowify-workflows-server/user"
 )
 
-func RegisterWorkspaceRoutes(r *mux.Route, k8sclient kubernetes.Interface) {
+func RegisterWorkspaceRoutes(r *mux.Route, k8sclient kubernetes.Interface, namespace string) {
 	s := r.Subrouter()
 
 	const intype = "application/json"
@@ -27,7 +27,7 @@ func RegisterWorkspaceRoutes(r *mux.Route, k8sclient kubernetes.Interface) {
 	s.Use(SetContentTypeMiddleware(outtype))
 
 	s.HandleFunc("/workspaces/", WorkspacesListHandler()).Methods(http.MethodGet)
-	s.HandleFunc("/workspaces/", WorkspacesCreateHandler(k8sclient)).Methods(http.MethodPost)
+	s.HandleFunc("/workspaces/", WorkspacesCreateHandler(k8sclient, namespace)).Methods(http.MethodPost)
 }
 
 func WorkspacesListHandler() http.HandlerFunc {
@@ -55,11 +55,12 @@ func WorkspacesListHandler() http.HandlerFunc {
 }
 
 type WorkspaceCreateInputData struct {
-	Name  string
-	Roles []string
+	Name                string
+	Roles               []string
+	HideForUnauthorized string
 }
 
-func WorkspacesCreateHandler(k8sclient kubernetes.Interface) http.HandlerFunc {
+func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var creationData WorkspaceCreateInputData
 		err := json.NewDecoder(r.Body).Decode(&creationData)
@@ -72,6 +73,8 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface) http.HandlerFunc {
 		nsName := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: creationData.Name,
+				//todo figure out what to do with WBS label
+				Labels: map[string]string{"WBS": "TEST.TEST"},
 			},
 		}
 		_, err = k8sclient.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
@@ -98,17 +101,21 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface) http.HandlerFunc {
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      creationData.Name,
-				Namespace: "argo",
+				Namespace: namespace,
 				Labels: map[string]string{
 					"app.kubernetes.io/component": "workspace-config",
 					"app.kubernetes.io/part-of":   "flowify",
 				},
 			},
-			Data: map[string]string{"roles": roles, "projectName": creationData.Name},
+			Data: map[string]string{
+				"roles":               roles,
+				"projectName":         creationData.Name,
+				"hideForUnauthorized": creationData.HideForUnauthorized,
+			},
 		}
 
 		CMOpt := metav1.CreateOptions{}
-		_, err = k8sclient.CoreV1().ConfigMaps("argo").Create(r.Context(), &cm, CMOpt)
+		_, err = k8sclient.CoreV1().ConfigMaps(namespace).Create(r.Context(), &cm, CMOpt)
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string

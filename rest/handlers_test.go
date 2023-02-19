@@ -624,7 +624,7 @@ func Test_WorkspacesHTTPHandler(t *testing.T) {
 	mux := gmux.NewRouter()
 	mux.Use(NewAuthorizationContext(client))
 	var k8sclient kubernetes.Interface
-	RegisterWorkspaceRoutes(mux.PathPrefix("/api/v1"), k8sclient)
+	RegisterWorkspaceRoutes(mux.PathPrefix("/api/v1"), k8sclient, "")
 	accessUser := user.MockUser{Uid: "0", Email: "test@author.com"}
 
 	type testCase struct {
