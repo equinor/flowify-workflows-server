@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -1188,4 +1189,20 @@ func (c *Conditional) UnmarshalBSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func WorkspacesInputToCreationData(input workspace.CreateInputData, namespace string) workspace.CreationData {
+	l := make(map[string]string)
+	if input.Labels != nil {
+		for _, label := range input.Labels {
+			l[label[0]] = label[len(label)-1]
+		}
+	}
+	return workspace.CreationData{
+		Name:                input.Name,
+		Roles:               input.Roles,
+		HideForUnauthorized: input.HideForUnauthorized,
+		Labels:              l,
+		Namespace:           namespace,
+	}
 }
