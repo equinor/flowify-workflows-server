@@ -58,6 +58,7 @@ type WorkspaceCreateInputData struct {
 	Name                string
 	Roles               []string
 	HideForUnauthorized string
+	Labels              [][]string
 }
 
 func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) http.HandlerFunc {
@@ -70,11 +71,17 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			}{Error: fmt.Sprintf("error decoding the input data: %v\n", err)}, "workspace")
 		}
 
+		labels := make(map[string]string)
+		if creationData.Labels != nil {
+			for _, label := range creationData.Labels {
+				labels[label[0]] = label[len(label)-1]
+			}
+		}
+
 		nsName := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: creationData.Name,
-				//todo figure out what to do with WBS label
-				Labels: map[string]string{"WBS": "TEST.TEST"},
+				Name:   creationData.Name,
+				Labels: labels,
 			},
 		}
 		_, err = k8sclient.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
