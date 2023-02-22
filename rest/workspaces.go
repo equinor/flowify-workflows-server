@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -128,6 +129,81 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 				Error string
 			}{Error: fmt.Sprintf("error creating configMap: %v\n", err)}, "workspace")
 		}
+
+		ROpt := metav1.CreateOptions{}
+		rn := creationData.Name + "-default-role"
+		rules := []v1.PolicyRule{{
+			APIGroups: []string{"argoproj.io"},
+			Resources: []string{"workflows", "workflowtemplates", "cronworkflows"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{""},
+			Resources: []string{"pods/log"},
+			Verbs:     []string{"get", "list", "watch"},
+		}, {
+			APIGroups: []string{""},
+			Resources: []string{"configmaps"},
+			Verbs:     []string{"get", "list"},
+		}, {
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+			Verbs:     []string{"get", "list", "watch", "patch"},
+		}, {
+			APIGroups:     []string{"extensions"},
+			Resources:     []string{"podsecuritypolicies"},
+			ResourceNames: []string{"000-aurora-kubeflow-psp"},
+			Verbs:         []string{"use"},
+		}, {
+			APIGroups: []string{""},
+			Resources: []string{"secrets", "secret", "serviceaccounts", "pods"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{"rbac.authorization.k8s.io"},
+			Resources: []string{"roles", "rolebindings"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}}
+		role := &v1.Role{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Role",
+				APIVersion: "rbac.authorization.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      rn,
+				Namespace: creationData.Name,
+			},
+			Rules: rules,
+		}
+		_, err = k8sclient.RbacV1().Roles(creationData.Name).Create(context.Background(), role, ROpt)
+		if err != nil {
+			WriteResponse(w, http.StatusInternalServerError, nil, struct {
+				Error string
+			}{Error: fmt.Sprintf("error creating Role: %v\n", err)}, "workspace")
+		}
+
+		RBOpt := metav1.CreateOptions{}
+		RBName := creationData.Name + "-default-rolebinding"
+		rr := v1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     rn,
+		}
+		rb := &v1.RoleBinding{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "RoleBinding",
+				APIVersion: "rbac.authorization.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      RBName,
+				Namespace: creationData.Name,
+			},
+			RoleRef: rr,
+			Subjects: []v1.Subject{{
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: creationData.Name,
+			}},
+		}
+		_, err = k8sclient.RbacV1().RoleBindings(namespace).Create(context.Background(), rb, RBOpt)
 
 		WriteResponse(w, http.StatusCreated, nil, struct {
 			Workspace string
