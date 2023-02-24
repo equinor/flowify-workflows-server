@@ -131,8 +131,73 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		}
 
 		ROpt := metav1.CreateOptions{}
-		rn := creationData.Name + "-default-role"
+		rn := "flowify-server-" + creationData.Name + "-role"
 		rules := []v1.PolicyRule{{
+			APIGroups: []string{""},
+			Resources: []string{"pods/log", "configmaps"},
+			Verbs:     []string{"get", "list", "watch"},
+		}, {
+			APIGroups: []string{""},
+			Resources: []string{"secrets", "secret", "serviceaccounts", "pods"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{"rbac.authorization.k8s.io"},
+			Resources: []string{"roles", "rolebindings"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}}
+		role := &v1.Role{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Role",
+				APIVersion: "rbac.authorization.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      rn,
+				Namespace: "flowify", // todo change to flowify
+			},
+			Rules: rules,
+		}
+		_, err = k8sclient.RbacV1().Roles("flowify").Create(context.Background(), role, ROpt)
+		if err != nil {
+			WriteResponse(w, http.StatusInternalServerError, nil, struct {
+				Error string
+			}{Error: fmt.Sprintf("error creating server Role: %v\n", err)}, "workspace")
+			return
+		}
+
+		RBOpt := metav1.CreateOptions{}
+		RBName := "flowify-server-" + creationData.Name + "-rolebinding"
+		rr := v1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     rn,
+		}
+		rb := &v1.RoleBinding{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "RoleBinding",
+				APIVersion: "rbac.authorization.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      RBName,
+				Namespace: "flowify",
+			},
+			RoleRef: rr,
+			Subjects: []v1.Subject{{
+				Kind:      "ServiceAccount",
+				Name:      "flowify-server",
+				Namespace: "flowify", //todo change to flowify
+			}},
+		}
+		_, err = k8sclient.RbacV1().RoleBindings("flowify").Create(context.Background(), rb, RBOpt)
+		if err != nil {
+			WriteResponse(w, http.StatusInternalServerError, nil, struct {
+				Error string
+			}{Error: fmt.Sprintf("error creating server RoleBinding: %v\n", err)}, "workspace")
+			return
+		}
+
+		ROpt = metav1.CreateOptions{}
+		rn = creationData.Name + "-default-role"
+		rules = []v1.PolicyRule{{
 			APIGroups: []string{"argoproj.io"},
 			Resources: []string{"workflows", "workflowtemplates", "cronworkflows"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
@@ -162,7 +227,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			Resources: []string{"roles", "rolebindings"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}}
-		role := &v1.Role{
+		role = &v1.Role{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Role",
 				APIVersion: "rbac.authorization.k8s.io/v1",
@@ -177,17 +242,18 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
-			}{Error: fmt.Sprintf("error creating Role: %v\n", err)}, "workspace")
+			}{Error: fmt.Sprintf("error creating default Role: %v\n", err)}, "workspace")
+			return
 		}
 
-		RBOpt := metav1.CreateOptions{}
-		RBName := creationData.Name + "-default-rolebinding"
-		rr := v1.RoleRef{
+		RBOpt = metav1.CreateOptions{}
+		RBName = creationData.Name + "-default-rolebinding"
+		rr = v1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "Role",
 			Name:     rn,
 		}
-		rb := &v1.RoleBinding{
+		rb = &v1.RoleBinding{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "RoleBinding",
 				APIVersion: "rbac.authorization.k8s.io/v1",
@@ -203,7 +269,13 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 				Namespace: creationData.Name,
 			}},
 		}
-		_, err = k8sclient.RbacV1().RoleBindings(namespace).Create(context.Background(), rb, RBOpt)
+		_, err = k8sclient.RbacV1().RoleBindings(creationData.Name).Create(context.Background(), rb, RBOpt)
+		if err != nil {
+			WriteResponse(w, http.StatusInternalServerError, nil, struct {
+				Error string
+			}{Error: fmt.Sprintf("error creating default RoleBinding: %v\n", err)}, "workspace")
+			return
+		}
 
 		WriteResponse(w, http.StatusCreated, nil, struct {
 			Workspace string
