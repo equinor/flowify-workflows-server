@@ -39,6 +39,7 @@ func Test_NodeRoundtrip(t *testing.T) {
 	"id": "A",
 	"node": {
 		"description": "A brick component",
+		"modifiedBy" : { "oid": "null", "email": "test@test.ts" },
 		"type": "component",
 		"implementation": {
 			"type": "brick",
