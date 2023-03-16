@@ -191,33 +191,8 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		ROpt = metav1.CreateOptions{}
 		rn = creationData.Name + "-default-role"
 		rules = []v1.PolicyRule{{
-			APIGroups: []string{"argoproj.io"},
-			Resources: []string{"workflows", "workflowtemplates", "cronworkflows"},
-			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
-		}, {
 			APIGroups: []string{""},
-			Resources: []string{"pods/log"},
-			Verbs:     []string{"get", "list", "watch"},
-		}, {
-			APIGroups: []string{""},
-			Resources: []string{"configmaps"},
-			Verbs:     []string{"get", "list"},
-		}, {
-			APIGroups: []string{""},
-			Resources: []string{"pods"},
-			Verbs:     []string{"get", "list", "watch", "patch"},
-		}, {
-			APIGroups:     []string{"extensions"},
-			Resources:     []string{"podsecuritypolicies"},
-			ResourceNames: []string{"000-aurora-kubeflow-psp"},
-			Verbs:         []string{"use"},
-		}, {
-			APIGroups: []string{""},
-			Resources: []string{"secrets", "secret", "serviceaccounts", "pods"},
-			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
-		}, {
-			APIGroups: []string{"rbac.authorization.k8s.io"},
-			Resources: []string{"roles", "rolebindings"},
+			Resources: []string{"secrets"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}}
 		role = &v1.Role{
@@ -231,7 +206,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			},
 			Rules: rules,
 		}
-		_, err = k8sclient.RbacV1().Roles(creationData.Name).Create(context.Background(), role, ROpt)
+		role2, err := k8sclient.RbacV1().Roles(creationData.Name).Create(context.Background(), role, ROpt)
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
@@ -244,7 +219,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		rr = v1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "Role",
-			Name:     rn,
+			Name:     role2.Name,
 		}
 		rb = &v1.RoleBinding{
 			TypeMeta: metav1.TypeMeta{
