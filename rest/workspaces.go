@@ -5,13 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-
 	"github.com/gorilla/mux"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"net/http"
 
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/user"
@@ -130,19 +129,13 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			}{Error: fmt.Sprintf("error creating configMap: %v\n", err)}, "workspace")
 		}
 
+		//todo
+		nstxt := "flowify"
 		ROpt := metav1.CreateOptions{}
 		rn := "flowify-server-" + creationData.Name + "-role"
 		rules := []v1.PolicyRule{{
 			APIGroups: []string{""},
-			Resources: []string{"pods/log", "configmaps"},
-			Verbs:     []string{"get", "list", "watch"},
-		}, {
-			APIGroups: []string{""},
-			Resources: []string{"secrets", "secret", "serviceaccounts", "pods"},
-			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
-		}, {
-			APIGroups: []string{"rbac.authorization.k8s.io"},
-			Resources: []string{"roles", "rolebindings"},
+			Resources: []string{"secrets"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}}
 		role := &v1.Role{
@@ -152,11 +145,11 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      rn,
-				Namespace: "flowify", // todo change to flowify
+				Namespace: nstxt, // todo change to flowify
 			},
 			Rules: rules,
 		}
-		_, err = k8sclient.RbacV1().Roles("flowify").Create(context.Background(), role, ROpt)
+		role1, err := k8sclient.RbacV1().Roles(nstxt).Create(context.Background(), role, ROpt)
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
@@ -169,7 +162,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		rr := v1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "Role",
-			Name:     rn,
+			Name:     role1.Name,
 		}
 		rb := &v1.RoleBinding{
 			TypeMeta: metav1.TypeMeta{
@@ -178,16 +171,16 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      RBName,
-				Namespace: "flowify",
+				Namespace: nstxt,
 			},
 			RoleRef: rr,
 			Subjects: []v1.Subject{{
 				Kind:      "ServiceAccount",
 				Name:      "flowify-server",
-				Namespace: "flowify", //todo change to flowify
+				Namespace: nstxt, //todo change to flowify
 			}},
 		}
-		_, err = k8sclient.RbacV1().RoleBindings("flowify").Create(context.Background(), rb, RBOpt)
+		_, err = k8sclient.RbacV1().RoleBindings(nstxt).Create(context.Background(), rb, RBOpt)
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
