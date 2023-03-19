@@ -135,7 +135,15 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		rn := "flowify-server-" + creationData.Name + "-role"
 		rules := []v1.PolicyRule{{
 			APIGroups: []string{""},
-			Resources: []string{"secrets", "secret", "serviceaccounts", "pods"},
+			Resources: []string{"pods/log", "configmaps"},
+			Verbs:     []string{"get", "list", "watch"},
+		}, {
+			APIGroups: []string{""},
+			Resources: []string{"secrets"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{"rbac.authorization.k8s.io"},
+			Resources: []string{"roles", "rolebindings"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}}
 		role := &v1.Role{
@@ -191,8 +199,33 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		ROpt = metav1.CreateOptions{}
 		rn = creationData.Name + "-default-role"
 		rules = []v1.PolicyRule{{
+			APIGroups: []string{"argoproj.io"},
+			Resources: []string{"workflows", "workflowtemplates", "cronworkflows"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{""},
+			Resources: []string{"pods/log"},
+			Verbs:     []string{"get", "list", "watch"},
+		}, {
+			APIGroups: []string{""},
+			Resources: []string{"configmaps"},
+			Verbs:     []string{"get", "list"},
+		}, {
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+			Verbs:     []string{"get", "list", "watch", "patch"},
+		}, {
+			APIGroups:     []string{"extensions"},
+			Resources:     []string{"podsecuritypolicies"},
+			ResourceNames: []string{"000-aurora-kubeflow-psp"},
+			Verbs:         []string{"use"},
+		}, {
 			APIGroups: []string{""},
 			Resources: []string{"secrets"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{"rbac.authorization.k8s.io"},
+			Resources: []string{"roles", "rolebindings"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}}
 		role = &v1.Role{
