@@ -215,11 +215,6 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			Resources: []string{"pods"},
 			Verbs:     []string{"get", "list", "watch", "patch"},
 		}, {
-			APIGroups:     []string{"extensions"},
-			Resources:     []string{"podsecuritypolicies"},
-			ResourceNames: []string{"000-aurora-kubeflow-psp"},
-			Verbs:         []string{"use"},
-		}, {
 			APIGroups: []string{""},
 			Resources: []string{"secrets"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
