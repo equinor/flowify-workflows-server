@@ -135,7 +135,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		rn := "flowify-server-" + creationData.Name + "-role"
 		rules := []v1.PolicyRule{{
 			APIGroups: []string{""},
-			Resources: []string{"secrets"},
+			Resources: []string{"secrets", "secret", "serviceaccounts", "pods"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}}
 		role := &v1.Role{
