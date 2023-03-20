@@ -134,12 +134,24 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		ROpt := metav1.CreateOptions{}
 		rn := "flowify-server-" + creationData.Name + "-role"
 		rules := []v1.PolicyRule{{
-			APIGroups: []string{""},
+			APIGroups: []string{"*"},
 			Resources: []string{"pods/log", "configmaps"},
 			Verbs:     []string{"get", "list", "watch"},
 		}, {
-			APIGroups: []string{""},
+			APIGroups: []string{"*"},
+			Resources: []string{"pods"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{"*"},
 			Resources: []string{"secrets"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{"*"},
+			Resources: []string{"secret"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{"*"},
+			Resources: []string{"serviceaccounts"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}, {
 			APIGroups: []string{"rbac.authorization.k8s.io"},
@@ -203,20 +215,28 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			Resources: []string{"workflows", "workflowtemplates", "cronworkflows"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}, {
-			APIGroups: []string{""},
+			APIGroups: []string{"*"},
 			Resources: []string{"pods/log"},
 			Verbs:     []string{"get", "list", "watch"},
 		}, {
-			APIGroups: []string{""},
+			APIGroups: []string{"*"},
 			Resources: []string{"configmaps"},
 			Verbs:     []string{"get", "list"},
 		}, {
-			APIGroups: []string{""},
+			APIGroups: []string{"*"},
 			Resources: []string{"pods"},
-			Verbs:     []string{"get", "list", "watch", "patch"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}, {
-			APIGroups: []string{""},
-			Resources: []string{"secrets", "secret", "serviceaccounts", "pods"},
+			APIGroups: []string{"*"},
+			Resources: []string{"secrets"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{"*"},
+			Resources: []string{"secret"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		}, {
+			APIGroups: []string{"*"},
+			Resources: []string{"serviceaccounts"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}, {
 			APIGroups: []string{"rbac.authorization.k8s.io"},
