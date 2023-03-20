@@ -147,7 +147,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}, {
 			APIGroups: []string{"*"},
-			Resources: []string{"serviceaccounts"},
+			Resources: []string{"secret"},
 			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
 		}, {
 			APIGroups: []string{"rbac.authorization.k8s.io"},
