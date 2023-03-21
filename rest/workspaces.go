@@ -161,11 +161,11 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      rn,
-				Namespace: nstxt, // todo change to flowify
+				Namespace: creationData.Name, // todo change to flowify
 			},
 			Rules: rules,
 		}
-		role1, err := k8sclient.RbacV1().Roles(nstxt).Create(context.Background(), role, ROpt)
+		role1, err := k8sclient.RbacV1().Roles(creationData.Name).Create(context.Background(), role, ROpt)
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
