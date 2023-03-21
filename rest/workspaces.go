@@ -216,7 +216,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			Verbs:     []string{"create"},
 		}, {
 			APIGroups:     []string{""},
-			Resources:     []string{"secret"},
+			Resources:     []string{"secrets"},
 			ResourceNames: []string{"flowify-default"},
 			Verbs:         []string{"get"},
 		}, {
@@ -239,7 +239,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
-			}{Error: fmt.Sprintf("error creating server Role: %v\n", err)}, "workspace")
+			}{Error: fmt.Sprintf("error creating flowify default Role: %v\n", err)}, "workspace")
 			return
 		}
 
@@ -270,7 +270,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		if err != nil {
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
-			}{Error: fmt.Sprintf("error creating server RoleBinding: %v\n", err)}, "workspace")
+			}{Error: fmt.Sprintf("error creating flowify default RoleBinding: %v\n", err)}, "workspace")
 			return
 		}
 
