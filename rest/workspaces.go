@@ -173,6 +173,10 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			return
 		}
 
+		WriteResponse(w, http.StatusInternalServerError, nil, struct {
+			Data string
+		}{Data: fmt.Sprintf("Role: %v\n, Name %s", role1, role1.Name)}, "workspace")
+
 		RBOpt := metav1.CreateOptions{}
 		RBName := "flowify-server-" + creationData.Name + "-rolebinding"
 		rr := v1.RoleRef{
