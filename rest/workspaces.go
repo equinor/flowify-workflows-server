@@ -207,7 +207,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			return
 		}
 
-		//todo check if i need it
+		//TODO CHECK IF I NEED IT
 		ROpt = metav1.CreateOptions{}
 		rn = "flowify-default"
 		rules = []v1.PolicyRule{{
@@ -231,7 +231,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      rn,
-				Namespace: creationData.Name, // todo change to flowify
+				Namespace: creationData.Name, // TODO CHANGE TO FLOWIFY
 			},
 			Rules: rules,
 		}
@@ -244,7 +244,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		}
 
 		RBOpt = metav1.CreateOptions{}
-		RBName = "flowify-default-rolebinding"
+		RBName = "flowify-default"
 		rr = v1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "Role",
@@ -262,7 +262,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			RoleRef: rr,
 			Subjects: []v1.Subject{{
 				Kind:      "ServiceAccount",
-				Name:      "default",
+				Name:      "flowify-default",
 				Namespace: creationData.Name, //todo change to flowify
 			}},
 		}
