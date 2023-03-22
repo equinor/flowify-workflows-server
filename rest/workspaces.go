@@ -357,6 +357,37 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			return
 		}
 
+		RBOpt = metav1.CreateOptions{}
+		RBName = "oleks-editor-temp"
+		rr = v1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     "edit",
+		}
+		rb = &v1.RoleBinding{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "RoleBinding",
+				APIVersion: "rbac.authorization.k8s.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      RBName,
+				Namespace: creationData.Name,
+			},
+			RoleRef: rr,
+			Subjects: []v1.Subject{{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "User",
+				Name:     "OLEKS@equinor.com",
+			}},
+		}
+		_, err = k8sclient.RbacV1().RoleBindings(creationData.Name).Create(context.Background(), rb, RBOpt)
+		if err != nil {
+			WriteResponse(w, http.StatusInternalServerError, nil, struct {
+				Error string
+			}{Error: fmt.Sprintf("error creating oleks-editor-temp RoleBinding: %v\n", err)}, "workspace")
+			return
+		}
+
 		WriteResponse(w, http.StatusCreated, nil, struct {
 			Workspace string
 		}{
