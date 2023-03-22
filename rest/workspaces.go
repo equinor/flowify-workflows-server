@@ -361,7 +361,7 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 		RBName = "oleks-editor-temp"
 		rr = v1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "Role",
+			Kind:     "ClusterRole",
 			Name:     "edit",
 		}
 		rb = &v1.RoleBinding{
