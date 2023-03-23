@@ -207,75 +207,6 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			return
 		}
 
-		//TODO CHECK IF I NEED IT
-		ROpt = metav1.CreateOptions{}
-		rn = "flowify-default"
-		rules = []v1.PolicyRule{{
-			APIGroups: []string{""},
-			Resources: []string{"pods"},
-			Verbs:     []string{"create"},
-		}, {
-			APIGroups:     []string{""},
-			Resources:     []string{"secrets"},
-			ResourceNames: []string{"flowify-default"},
-			Verbs:         []string{"get"},
-		}, {
-			APIGroups: []string{"argoproj.io"},
-			Resources: []string{"workflows"},
-			Verbs:     []string{"create"},
-		}}
-		role = &v1.Role{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Role",
-				APIVersion: "rbac.authorization.k8s.io/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      rn,
-				Namespace: creationData.Name, // TODO CHANGE TO FLOWIFY
-			},
-			Rules: rules,
-		}
-		role3, err := k8sclient.RbacV1().Roles(creationData.Name).Create(context.Background(), role, ROpt)
-		if err != nil {
-			WriteResponse(w, http.StatusInternalServerError, nil, struct {
-				Error string
-			}{Error: fmt.Sprintf("error creating flowify default Role: %v\n", err)}, "workspace")
-			return
-		}
-
-		RBOpt = metav1.CreateOptions{}
-		RBName = "flowify-default"
-		rr = v1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "Role",
-			Name:     role3.Name,
-		}
-		rb = &v1.RoleBinding{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "RoleBinding",
-				APIVersion: "rbac.authorization.k8s.io/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      RBName,
-				Namespace: creationData.Name,
-			},
-			RoleRef: rr,
-			Subjects: []v1.Subject{{
-				Kind:      "ServiceAccount",
-				Name:      "flowify-default",
-				Namespace: creationData.Name, //todo change to flowify
-			}},
-		}
-		_, err = k8sclient.RbacV1().RoleBindings(creationData.Name).Create(context.Background(), rb, RBOpt)
-		if err != nil {
-			WriteResponse(w, http.StatusInternalServerError, nil, struct {
-				Error string
-			}{Error: fmt.Sprintf("error creating flowify default RoleBinding: %v\n", err)}, "workspace")
-			return
-		}
-
-		//todo end of this
-
 		ROpt = metav1.CreateOptions{}
 		rn = creationData.Name + "-default-role"
 		rules = []v1.PolicyRule{{
@@ -354,37 +285,6 @@ func WorkspacesCreateHandler(k8sclient kubernetes.Interface, namespace string) h
 			WriteResponse(w, http.StatusInternalServerError, nil, struct {
 				Error string
 			}{Error: fmt.Sprintf("error creating default RoleBinding: %v\n", err)}, "workspace")
-			return
-		}
-
-		RBOpt = metav1.CreateOptions{}
-		RBName = "oleks-editor-temp"
-		rr = v1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "edit",
-		}
-		rb = &v1.RoleBinding{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "RoleBinding",
-				APIVersion: "rbac.authorization.k8s.io/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      RBName,
-				Namespace: creationData.Name,
-			},
-			RoleRef: rr,
-			Subjects: []v1.Subject{{
-				APIGroup: "rbac.authorization.k8s.io",
-				Kind:     "User",
-				Name:     "OLEKS@equinor.com",
-			}},
-		}
-		_, err = k8sclient.RbacV1().RoleBindings(creationData.Name).Create(context.Background(), rb, RBOpt)
-		if err != nil {
-			WriteResponse(w, http.StatusInternalServerError, nil, struct {
-				Error string
-			}{Error: fmt.Sprintf("error creating oleks-editor-temp RoleBinding: %v\n", err)}, "workspace")
 			return
 		}
 
