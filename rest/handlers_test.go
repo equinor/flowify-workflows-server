@@ -77,6 +77,10 @@ func (c *workspaceClient) GetNamespace() string {
 	return args.Get(0).(string)
 }
 
+func (c *workspaceClient) Create(k8sclient kubernetes.Interface, creationData workspace.CreationData) (string, error) {
+	return "", nil
+}
+
 func NewMockClient() *componentClient {
 	return &componentClient{}
 }
@@ -624,7 +628,7 @@ func Test_WorkspacesHTTPHandler(t *testing.T) {
 	mux := gmux.NewRouter()
 	mux.Use(NewAuthorizationContext(client))
 	var k8sclient kubernetes.Interface
-	RegisterWorkspaceRoutes(mux.PathPrefix("/api/v1"), k8sclient)
+	RegisterWorkspaceRoutes(mux.PathPrefix("/api/v1"), k8sclient, "", client)
 	accessUser := user.MockUser{Uid: "0", Email: "test@author.com"}
 
 	type testCase struct {

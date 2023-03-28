@@ -16,7 +16,6 @@ import (
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/storage"
 	"github.com/equinor/flowify-workflows-server/user"
-
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes"
@@ -107,7 +106,8 @@ func RegisterRoutes(r *mux.Route,
 	k8sclient kubernetes.Interface,
 	sec auth.AuthenticationClient,
 	authz auth.AuthorizationClient,
-	wsclient workspace.WorkspaceClient) {
+	wsclient workspace.WorkspaceClient,
+	namespace string) {
 
 	subrouter := r.Subrouter()
 
@@ -118,7 +118,7 @@ func RegisterRoutes(r *mux.Route,
 	RegisterOpenApiRoutes(subrouter.PathPrefix("/spec"))
 	RegisterUserInfoRoutes(subrouter.PathPrefix(""))
 	RegisterComponentRoutes(subrouter.PathPrefix(""), componentClient)
-	RegisterWorkspaceRoutes(subrouter.PathPrefix(""), k8sclient)
+	RegisterWorkspaceRoutes(subrouter.PathPrefix(""), k8sclient, namespace, wsclient)
 
 	// the following handlers below will use the authorized context's WorkspaceAccess
 	RegisterWorkflowRoutes(subrouter.PathPrefix(""), componentClient)

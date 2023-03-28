@@ -3,6 +3,12 @@ package apiserver
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	k8srest "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"net"
 	"net/http"
 	"os"
@@ -11,20 +17,12 @@ import (
 	"time"
 
 	argo_workflow "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
-	gmux "github.com/gorilla/mux"
-	"github.com/pkg/errors"
-
 	"github.com/equinor/flowify-workflows-server/auth"
 	"github.com/equinor/flowify-workflows-server/pkg/secret"
 	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	"github.com/equinor/flowify-workflows-server/rest"
 	"github.com/equinor/flowify-workflows-server/storage"
-	log "github.com/sirupsen/logrus"
-
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	k8srest "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
+	gmux "github.com/gorilla/mux"
 )
 
 var backoff = wait.Backoff{
@@ -89,7 +87,7 @@ func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
 		return flowifyServer{}, errors.Wrap(err, "could not create new volume storage")
 	}
 
-	workspace := workspace.NewWorkspaceClient(kubeClient, cfg.KubernetesKonfig.Namespace)
+	workspaceClient := workspace.NewWorkspaceClient(kubeClient, cfg.KubernetesKonfig.Namespace)
 	secretClient := secret.NewSecretClient(kubeClient)
 
 	authClient, err := auth.NewAuthClientFromConfig(cfg.AuthConfig)
@@ -97,7 +95,7 @@ func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
 		return flowifyServer{}, errors.Wrap(err, "could not create auth")
 	}
 
-	authz := auth.RoleAuthorizer{Workspaces: workspace}
+	authz := auth.RoleAuthorizer{Workspaces: workspaceClient}
 
 	return flowifyServer{
 		k8Client:      kubeClient,
@@ -105,7 +103,7 @@ func NewFlowifyServerFromConfig(cfg Config) (flowifyServer, error) {
 		wfClient:      argoClient,
 		nodeStorage:   nodeStorage,
 		volumeStorage: volumeStorage,
-		workspace:     workspace,
+		workspace:     workspaceClient,
 		secrets:       secretClient,
 		portnumber:    cfg.ServerConfig.Port,
 		auth:          authClient,
@@ -237,7 +235,7 @@ func SetCustomHeaders(next http.Handler) http.Handler {
 
 func (fs *flowifyServer) registerApplicationRoutes(router *gmux.Router) {
 	// send a pathprefix that catches all and handle in a subrouter to avoid interference
-	rest.RegisterRoutes(router.PathPrefix(ApiV1Path), fs.nodeStorage, fs.volumeStorage, fs.secrets, fs.wfClient, fs.k8Client, fs.auth, fs.authz, fs.workspace)
+	rest.RegisterRoutes(router.PathPrefix(ApiV1Path), fs.nodeStorage, fs.volumeStorage, fs.secrets, fs.wfClient, fs.k8Client, fs.auth, fs.authz, fs.workspace, fs.namespace)
 
 	router.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "alive") }).Methods(http.MethodGet)
 	router.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintf(w, "ready") }).Methods(http.MethodGet)

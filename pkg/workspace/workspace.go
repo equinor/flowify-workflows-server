@@ -1,7 +1,20 @@
 package workspace
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
+	apicore1 "k8s.io/api/core/v1"
+	core "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	v1 "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"strings"
 	"sync"
 	"time"
@@ -9,14 +22,6 @@ import (
 	userpkg "github.com/equinor/flowify-workflows-server/user"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	core "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/informers"
-	v1 "k8s.io/client-go/informers/core/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -27,6 +32,21 @@ const (
 	workspaceConfigMapLabel         = "app.kubernetes.io/component"
 	workspaceConfigMapLabelSelector = "workspace-config"
 )
+
+type CreationData struct {
+	Name                string
+	Roles               []string
+	HideForUnauthorized string
+	Labels              map[string]string
+	Namespace           string
+}
+
+type CreateInputData struct {
+	Name                string
+	Roles               []string
+	HideForUnauthorized string
+	Labels              [][]string
+}
 
 type Workspace struct {
 	Name                string `json:"name"`
@@ -41,6 +61,7 @@ type WorkspaceClient interface {
 	// list the workspaces visible to a specific user
 	ListWorkspaces() []Workspace
 	GetNamespace() string
+	Create(k8sclient kubernetes.Interface, cd CreationData) (string, error)
 }
 
 func NewWorkspaceClient(clientSet kubernetes.Interface, namespace string) WorkspaceClient {
@@ -254,6 +275,57 @@ func getAccessTokens(cm *core.ConfigMap) ([][]userpkg.Role, error) {
 
 		return append(requiredTokens, tokens), nil
 	}
+}
+
+func (w *workspaceImpl) Create(k8sclient kubernetes.Interface, creationData CreationData) (string, error) {
+
+	nsName := &apicore1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   creationData.Name,
+			Labels: creationData.Labels,
+		},
+	}
+	_, err := k8sclient.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error %s", err)
+	}
+
+	var strBuffer bytes.Buffer
+	strBuffer.WriteString("[")
+	for _, role := range creationData.Roles {
+		strBuffer.WriteString("\"")
+		strBuffer.WriteString(role)
+		strBuffer.WriteString("\", ")
+	}
+	roles := strBuffer.String()
+	roles = roles[:len(roles)-2] + "]"
+
+	cm := apicore1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      creationData.Name,
+			Namespace: creationData.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/component": "workspace-config",
+				"app.kubernetes.io/part-of":   "flowify",
+			},
+		},
+		Data: map[string]string{
+			"roles":               roles,
+			"projectName":         creationData.Name,
+			"hideForUnauthorized": creationData.HideForUnauthorized,
+		},
+	}
+
+	CMOpt := metav1.CreateOptions{}
+	_, err = k8sclient.CoreV1().ConfigMaps(creationData.Namespace).Create(context.Background(), &cm, CMOpt)
+	if err != nil {
+		return "", fmt.Errorf("error %s", err)
+	}
+	return fmt.Sprintf("The workspace %s has been created", nsName.Name), nil
 }
 
 func (wimpl *workspaceImpl) ListWorkspaces() []Workspace {

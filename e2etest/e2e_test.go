@@ -13,6 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/equinor/flowify-workflows-server/apiserver"
+	"github.com/equinor/flowify-workflows-server/models"
+	fuser "github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -25,10 +28,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-
-	"github.com/equinor/flowify-workflows-server/apiserver"
-	"github.com/equinor/flowify-workflows-server/models"
-	fuser "github.com/equinor/flowify-workflows-server/user"
 )
 
 type e2eTestSuite struct {
