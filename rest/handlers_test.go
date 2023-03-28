@@ -77,7 +77,15 @@ func (c *workspaceClient) GetNamespace() string {
 	return args.Get(0).(string)
 }
 
-func (c *workspaceClient) Create(k8sclient kubernetes.Interface, creationData workspace.CreationData) (string, error) {
+func (c *workspaceClient) Create(k8sclient kubernetes.Interface, creationData workspace.Data) (string, error) {
+	return "", nil
+}
+
+func (c *workspaceClient) Update(k8sclient kubernetes.Interface, creationData workspace.Data) (string, error) {
+	return "", nil
+}
+
+func (c *workspaceClient) Delete(k8sclient kubernetes.Interface, namespace string, wsName string) (string, error) {
 	return "", nil
 }
 

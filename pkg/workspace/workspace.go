@@ -33,7 +33,7 @@ const (
 	workspaceConfigMapLabelSelector = "workspace-config"
 )
 
-type CreationData struct {
+type Data struct {
 	Name                string
 	Roles               []string
 	HideForUnauthorized string
@@ -41,7 +41,7 @@ type CreationData struct {
 	Namespace           string
 }
 
-type CreateInputData struct {
+type InputData struct {
 	Name                string
 	Roles               []string
 	HideForUnauthorized string
@@ -61,7 +61,9 @@ type WorkspaceClient interface {
 	// list the workspaces visible to a specific user
 	ListWorkspaces() []Workspace
 	GetNamespace() string
-	Create(k8sclient kubernetes.Interface, cd CreationData) (string, error)
+	Create(k8sclient kubernetes.Interface, cd Data) (string, error)
+	Update(k8sclient kubernetes.Interface, cd Data) (string, error)
+	Delete(k8sclient kubernetes.Interface, namespace string, wsName string) (string, error)
 }
 
 func NewWorkspaceClient(clientSet kubernetes.Interface, namespace string) WorkspaceClient {
@@ -77,16 +79,16 @@ func NewWorkspaceClient(clientSet kubernetes.Interface, namespace string) Worksp
 	cmInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(cm interface{}) {
-				obj.Update()
+				obj.UpdateConfigMaps()
 			},
-			DeleteFunc: func(cm interface{}) { obj.Update() },
+			DeleteFunc: func(cm interface{}) { obj.UpdateConfigMaps() },
 			UpdateFunc: func(cm interface{}, cmNew interface{}) {
 				if cm.(*core.ConfigMap).ResourceVersion == cmNew.(*core.ConfigMap).ResourceVersion {
 					return
 				}
 
 				if cmNew.(*core.ConfigMap).Labels["app.kubernetes.io/component"] == "workspace-config" {
-					obj.Update()
+					obj.UpdateConfigMaps()
 				}
 			},
 		})
@@ -96,7 +98,7 @@ func NewWorkspaceClient(clientSet kubernetes.Interface, namespace string) Worksp
 	informerFactory.WaitForCacheSync(wait.NeverStop)
 
 	// populate the initial ws-list
-	obj.Update()
+	obj.UpdateConfigMaps()
 
 	return obj
 }
@@ -172,7 +174,7 @@ func listWorkspaceConfigMaps(namespace string, cmInformer v1.ConfigMapInformer) 
 	return newlist, nil
 }
 
-func (w *workspaceImpl) Update() {
+func (w *workspaceImpl) UpdateConfigMaps() {
 	// get the configmaps with workspaces from k8s
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
@@ -277,7 +279,7 @@ func getAccessTokens(cm *core.ConfigMap) ([][]userpkg.Role, error) {
 	}
 }
 
-func (w *workspaceImpl) Create(k8sclient kubernetes.Interface, creationData CreationData) (string, error) {
+func (w *workspaceImpl) Create(k8sclient kubernetes.Interface, creationData Data) (string, error) {
 
 	nsName := &apicore1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -326,6 +328,61 @@ func (w *workspaceImpl) Create(k8sclient kubernetes.Interface, creationData Crea
 		return "", fmt.Errorf("error %s", err)
 	}
 	return fmt.Sprintf("The workspace %s has been created", nsName.Name), nil
+}
+
+func (w *workspaceImpl) Update(k8sclient kubernetes.Interface, data Data) (string, error) {
+
+	ns, err := k8sclient.CoreV1().Namespaces().Get(context.Background(), data.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error %s", err)
+	}
+
+	ns.Labels = data.Labels
+
+	_, err = k8sclient.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error %s, NS %s", err, ns)
+	}
+
+	var strBuffer bytes.Buffer
+	strBuffer.WriteString("[")
+	for _, role := range data.Roles {
+		strBuffer.WriteString("\"")
+		strBuffer.WriteString(role)
+		strBuffer.WriteString("\", ")
+	}
+	roles := strBuffer.String()
+	roles = roles[:len(roles)-2] + "]"
+
+	cm, err := k8sclient.CoreV1().ConfigMaps(data.Namespace).Get(context.Background(), data.Name, metav1.GetOptions{})
+
+	cm.Name = data.Name
+	cm.Namespace = data.Namespace
+	cm.Data = map[string]string{
+		"roles":               roles,
+		"projectName":         data.Name,
+		"hideForUnauthorized": data.HideForUnauthorized,
+	}
+
+	_, err = k8sclient.CoreV1().ConfigMaps(data.Namespace).Update(context.Background(), cm, metav1.UpdateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error %s", err)
+	}
+	return fmt.Sprintf("The workspace %s has been updated", ns.Name), nil
+}
+
+func (w *workspaceImpl) Delete(k8sclient kubernetes.Interface, namespace string, wsName string) (string, error) {
+	err := k8sclient.CoreV1().Namespaces().Delete(context.Background(), wsName, metav1.DeleteOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error %s", err)
+	}
+
+	err = k8sclient.CoreV1().ConfigMaps(namespace).Delete(context.Background(), wsName, metav1.DeleteOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error %s", err)
+	}
+
+	return "Success", nil
 }
 
 func (wimpl *workspaceImpl) ListWorkspaces() []Workspace {
