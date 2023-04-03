@@ -370,7 +370,7 @@ func (s *e2eTestSuite) Test_Roundtrip_Component() {
 
 }
 
-func (s *e2eTestSuite) TestWorkspaceCreate() {
+func (s *e2eTestSuite) TestWorkspaceCRUD() {
 	requestor := make_authenticated_requestor(s.client, mockUser)
 
 	id := uuid.New()
@@ -379,6 +379,16 @@ func (s *e2eTestSuite) TestWorkspaceCreate() {
 	resp, err := requestor(server_addr+"/api/v1/workspaces/", http.MethodPost, body)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), http.StatusCreated, resp.StatusCode)
+
+	body = fmt.Sprintf("{\"Name\":\"new-workspace-%s\", \"Roles\":[\"sandbox\"]}", id.String())
+	resp, err = requestor(server_addr+"/api/v1/workspaces/", http.MethodPut, body)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), http.StatusOK, resp.StatusCode)
+
+	body = fmt.Sprintf("{\"Name\":\"new-workspace-%s\"}", id.String())
+	resp, err = requestor(server_addr+"/api/v1/workspaces/", http.MethodDelete, body)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), http.StatusOK, resp.StatusCode)
 }
 
 func (s *e2eTestSuite) Test_Roundtrip_Workflow() {
