@@ -37,10 +37,10 @@ func WorkspacesListHandler() http.HandlerFunc {
 			wsgr := workspace.WorkspaceGetRequest{Name: ws.Name, Description: ws.Description}
 			roles := []string{}
 			if ws.UserHasAccess(usr) {
-				roles = append(roles, "user")
+				roles = append(roles, "ws-collaborator")
 			}
 			if ws.UserHasAdminAccess(usr) {
-				roles = append(roles, "admin")
+				roles = append(roles, "ws-owner")
 			}
 			wsgr.Roles = roles
 			lst = append(lst, wsgr)

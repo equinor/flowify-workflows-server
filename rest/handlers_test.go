@@ -656,25 +656,25 @@ func Test_WorkspacesHTTPHandler(t *testing.T) {
 			Name:      "list workspaces with access test-dev (user only)",
 			UserRoles: []user.Role{"test-dev"},
 			ExpectedWss: []workspace.WorkspaceGetRequest{
-				{Name: "test1", Roles: []string{"user"}}, {Name: "test2", Roles: []string{"user"}}, {Name: "test3", Roles: []string{}}},
+				{Name: "test1", Roles: []string{"ws-collaborator"}}, {Name: "test2", Roles: []string{"ws-collaborator"}}, {Name: "test3", Roles: []string{}}},
 		},
 		{
 			Name:      "list workspaces with access test3-admin",
 			UserRoles: []user.Role{"test3", "test3-admin"},
 			ExpectedWss: []workspace.WorkspaceGetRequest{
-				{Name: "test1", Roles: []string{}}, {Name: "test3", Roles: []string{"user", "admin"}}},
+				{Name: "test1", Roles: []string{}}, {Name: "test3", Roles: []string{"ws-collaborator", "ws-owner"}}},
 		},
 		{
 			Name:      "list workspaces with access test-dev test3",
 			UserRoles: []user.Role{"test-dev", "test3"},
 			ExpectedWss: []workspace.WorkspaceGetRequest{
-				{Name: "test1", Roles: []string{"user"}}, {Name: "test2", Roles: []string{"user"}}, {Name: "test3", Roles: []string{"user"}}},
+				{Name: "test1", Roles: []string{"ws-collaborator"}}, {Name: "test2", Roles: []string{"ws-collaborator"}}, {Name: "test3", Roles: []string{"ws-collaborator"}}},
 		},
 		{
 			Name:      "list workspaces with access test-dev-admin test3-admin",
 			UserRoles: []user.Role{"test-dev", "test-dev-admin", "test3", "test3-admin"},
 			ExpectedWss: []workspace.WorkspaceGetRequest{
-				{Name: "test1", Roles: []string{"user", "admin"}}, {Name: "test2", Roles: []string{"user", "admin"}}, {Name: "test3", Roles: []string{"user", "admin"}}},
+				{Name: "test1", Roles: []string{"ws-collaborator", "ws-owner"}}, {Name: "test2", Roles: []string{"ws-collaborator", "ws-owner"}}, {Name: "test3", Roles: []string{"ws-collaborator", "ws-owner"}}},
 		},
 	}
 
