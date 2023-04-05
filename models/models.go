@@ -1192,17 +1192,10 @@ func (c *Conditional) UnmarshalBSON(data []byte) error {
 }
 
 func WorkspacesInputToCreateData(input workspace.InputData, namespace string) workspace.Data {
-	l := make(map[string]string)
-	if input.Labels != nil {
-		for _, label := range input.Labels {
-			l[label[0]] = label[len(label)-1]
-		}
-	}
 	return workspace.Data{
 		Name:                input.Name,
 		Roles:               input.Roles,
 		HideForUnauthorized: input.HideForUnauthorized,
-		Labels:              l,
 		Namespace:           namespace,
 	}
 }
