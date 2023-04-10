@@ -280,14 +280,17 @@ func getAccessTokens(cm *core.ConfigMap) ([][]userpkg.Role, error) {
 }
 
 func (w *workspaceImpl) Create(k8sclient kubernetes.Interface, creationData Data) (string, error) {
-
+	ns, err := k8sclient.CoreV1().Namespaces().Get(context.Background(), creationData.Namespace, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("error %s", err)
+	}
 	nsName := &apicore1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   creationData.Name,
-			Labels: creationData.Labels,
+			Labels: ns.ObjectMeta.Labels,
 		},
 	}
-	_, err := k8sclient.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
+	_, err = k8sclient.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("error %s", err)
 	}
