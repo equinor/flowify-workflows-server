@@ -254,6 +254,22 @@ func (ws Workspace) UserHasAdminAccess(user userpkg.User) bool {
 	return false
 }
 
+func (ws Workspace) UserCanSeeCustomRoles(user userpkg.User) ([]userpkg.Role, bool) {
+	var CustomRoles []userpkg.Role
+	can := userpkg.CanSeeCustomRoles(user)
+	for _, rs := range ws.Roles {
+		for _, r := range rs {
+			if strings.Contains(string(r), "--$") {
+				CustomRoles = append(CustomRoles, r)
+			}
+		}
+	}
+	if CustomRoles == nil {
+		return CustomRoles, can
+	}
+	return CustomRoles, can
+}
+
 func getAccessTokens(cm *core.ConfigMap) ([][]userpkg.Role, error) {
 	roleString := cm.Data[RolesKey]
 
