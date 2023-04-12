@@ -15,6 +15,7 @@ import (
 
 	"github.com/equinor/flowify-workflows-server/apiserver"
 	"github.com/equinor/flowify-workflows-server/models"
+	"github.com/equinor/flowify-workflows-server/pkg/workspace"
 	fuser "github.com/equinor/flowify-workflows-server/user"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
@@ -48,6 +49,20 @@ var mockUser fuser.User = fuser.MockUser{
 	Name:  "Auth Disabled",
 	Email: "auth@disabled",
 	Roles: []fuser.Role{"tester", "dummy", "sandbox-developer"},
+}
+
+var mockUserCanSeeCustomRoles fuser.User = fuser.MockUser{
+	Uid:   "0",
+	Name:  "Auth Disabled",
+	Email: "auth@disabled",
+	Roles: []fuser.Role{"tester", "dummy", "developer-admin"},
+}
+
+var mockUserCannotSeeCustomRoles fuser.User = fuser.MockUser{
+	Uid:   "0",
+	Name:  "Auth Disabled",
+	Email: "auth@disabled",
+	Roles: []fuser.Role{"user"},
 }
 
 // TODO: not in use, add clean workspace for e2e tests in k8s
@@ -384,6 +399,69 @@ func (s *e2eTestSuite) TestWorkspaceCRUD() {
 	resp, err = requestor(server_addr+"/api/v1/workspaces/", http.MethodPut, body)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), http.StatusOK, resp.StatusCode)
+
+	body = fmt.Sprintf("{\"Name\":\"new-workspace-%s\"}", id.String())
+	resp, err = requestor(server_addr+"/api/v1/workspaces/", http.MethodDelete, body)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), http.StatusOK, resp.StatusCode)
+}
+
+func (s *e2eTestSuite) TestUserCanSeeCustomRole() {
+
+	type testCase struct {
+		User   fuser.User
+		Name   string
+		CanSee bool
+	}
+	testCases := []testCase{
+		{
+			User:   mockUserCanSeeCustomRoles,
+			Name:   "Can see custom roles",
+			CanSee: true,
+		},
+		{
+			User:   mockUserCannotSeeCustomRoles,
+			Name:   "Cannot see custom roles",
+			CanSee: false,
+		},
+	}
+
+	requestor := make_authenticated_requestor(s.client, mockUser)
+
+	id := uuid.New()
+	body := fmt.Sprintf("{\"Name\":\"new-workspace-%s\", \"Roles\":[\"test@gmail.com--$owner\"]}", id.String())
+
+	resp, err := requestor(server_addr+"/api/v1/workspaces/", http.MethodPost, body)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), http.StatusCreated, resp.StatusCode)
+
+	for _, test := range testCases {
+		s.T().Run(test.Name, func(t *testing.T) {
+			// prepare request
+			requester := make_authenticated_requestor(s.client, test.User)
+			resp, err = requester(server_addr+"/api/v1/workspaces/", http.MethodGet, "")
+
+			require.NoError(t, err)
+
+			type WorkspaceList struct {
+				Items []workspace.WorkspaceGetRequest `json:"items"`
+			}
+			var list WorkspaceList
+
+			err = marshalResponse(ResponseBodyBytes(resp), &list)
+
+			for _, l := range list.Items {
+				if l.Name == fmt.Sprintf("new-workspace-%s", id.String()) {
+					if test.CanSee {
+						require.NotEmpty(t, l.Roles)
+						require.Equal(s.T(), "test@gmail.com--$owner", l.Roles[0])
+					} else {
+						require.Empty(s.T(), l.Roles)
+					}
+				}
+			}
+		})
+	}
 
 	body = fmt.Sprintf("{\"Name\":\"new-workspace-%s\"}", id.String())
 	resp, err = requestor(server_addr+"/api/v1/workspaces/", http.MethodDelete, body)

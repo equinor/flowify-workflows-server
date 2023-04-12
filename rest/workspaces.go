@@ -42,6 +42,12 @@ func WorkspacesListHandler() http.HandlerFunc {
 			if ws.UserHasAdminAccess(usr) {
 				roles = append(roles, "ws-owner")
 			}
+			customRoles, ok := ws.UserCanSeeCustomRoles(usr)
+			if ok {
+				for _, customRole := range customRoles {
+					roles = append(roles, string(customRole))
+				}
+			}
 			wsgr.Roles = roles
 			lst = append(lst, wsgr)
 		}
