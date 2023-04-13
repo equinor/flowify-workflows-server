@@ -23,9 +23,21 @@ func RegisterWorkspaceRoutes(r *mux.Route, k8sclient kubernetes.Interface, names
 	s.Use(SetContentTypeMiddleware(outtype))
 
 	s.HandleFunc("/workspaces/", WorkspacesListHandler()).Methods(http.MethodGet)
-	s.HandleFunc("/workspaces/", WorkspacesCreateHandler(k8sclient, namespace, wsClient)).Methods(http.MethodPost)
+	s.HandleFunc("/workspaces/", CreationPathAuthorization(WorkspacesCreateHandler(k8sclient, namespace, wsClient))).Methods(http.MethodPost)
 	s.HandleFunc("/workspaces/", WorkspacesUpdateHandler(k8sclient, namespace, wsClient)).Methods(http.MethodPut)
 	s.HandleFunc("/workspaces/", WorkspacesDeleteHandler(k8sclient, namespace, wsClient)).Methods(http.MethodDelete)
+}
+
+func CreationPathAuthorization(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u := user.GetUser(r.Context())
+		if !user.CanCreateWorkspaces(u) {
+			err := fmt.Errorf("not authorized")
+			AuthorizationDenied(w, r, err)
+			return
+		}
+		next(w, r)
+	})
 }
 
 func WorkspacesListHandler() http.HandlerFunc {

@@ -236,6 +236,10 @@ func (ws Workspace) UserHasAdminAccess(user userpkg.User) bool {
 	for _, rs := range ws.Roles {
 		// rs is a list of roles of which the user has to fulfill all of to gain access
 		var userHasRole bool
+		if userpkg.HasOwnership(user, rs) {
+			return true
+		}
+
 		for _, r := range rs {
 			userHasRole = userpkg.UserHasRole(user, AdminRole(r))
 			if !userHasRole {
