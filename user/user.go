@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"strings"
 )
 
 type ContextKey int
@@ -10,8 +11,11 @@ const (
 	UserKey ContextKey = iota
 )
 
+const CustomRolePattern string = "--$"
+
 type Role string
 
+var ListGroupsCanCreateWorkspaces = [3]string{"admin", "developer-admin", "sandbox-developer"}
 var ListGroupsCanSeeCustomRoles = [3]string{"admin", "developer-admin", "sandbox-developer"}
 
 // tightly modelled on JWT: http://jwt.io
@@ -22,6 +26,17 @@ type User interface {
 	GetRoles() []Role
 }
 
+func CanCreateWorkspaces(user User) bool {
+	for _, role := range user.GetRoles() {
+		for _, r := range ListGroupsCanCreateWorkspaces {
+			if string(role) == r {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func GetUser(ctx context.Context) User {
 	val := ctx.Value(UserKey)
 
@@ -30,6 +45,19 @@ func GetUser(ctx context.Context) User {
 	} else {
 		return val.(User)
 	}
+}
+
+func HasOwnership(u User, roles []Role) bool {
+	var hasOwnership bool
+	for _, r := range roles {
+		if strings.Contains(string(r), CustomRolePattern) {
+			cr := u.GetEmail() + CustomRolePattern + "owner"
+			if string(r) == cr {
+				hasOwnership = true
+			}
+		}
+	}
+	return hasOwnership
 }
 
 func UserHasRole(u User, entry Role) bool {
