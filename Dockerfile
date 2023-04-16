@@ -1,4 +1,4 @@
-FROM golang:1.18-alpine as base
+FROM golang:1-alpine as base
 LABEL description="Flowify build test environment"
 LABEL org.opencontainers.image.source = "https://github.com/equinor/flowify-workflows-server"
 
