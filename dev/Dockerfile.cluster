@@ -1,4 +1,4 @@
-FROM alpine:latest as base
+FROM alpine:3.17.3 as base
 LABEL description="Flowify cluster environment"
 RUN apk add --no-cache \
     bash \
