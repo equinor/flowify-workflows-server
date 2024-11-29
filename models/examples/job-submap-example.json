@@ -25,6 +25,7 @@
         {
             "uid": "192161d7-e3f2-4991-adc0-a99c88c144c0",
             "description": "Graph component",
+            "modifiedBy" : { "oid": "null", "email": "test@test.ts" },
             "inputs": [
                 { "name": "numParts", "type": "parameter" },
                 { "name": "secretL1", "type": "env_secret" },
@@ -90,6 +91,7 @@
                                 "node": {
                                     "uid": "192161d7-e3f2-4991-adc0-a99c88c144c2",
                                     "description": "Map inner graph",
+                                    "modifiedBy" : { "oid": "null", "email": "test@test.ts" },
                                     "inputs": [
                                         { "name": "nparts", "type": "parameter" },
                                         { "name": "brn", "type": "parameter" },
